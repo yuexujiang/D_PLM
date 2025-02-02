@@ -1,0 +1,15 @@
+2025-01-10 16:14:38,707 - use adapter H
+2025-01-10 16:17:00,142 - trainable params:  45,815,104 || all params:  696,858,358 || trainable%: 6.574521705026317
+2025-01-10 16:17:00,143 - trainable params:  2,095,950 || all params:  2,095,950 || trainable%: 100.0
+2025-01-10 16:17:00,144 - preparing model is done
+2025-01-10 16:17:00,144 - prepare the optimizers
+2025-01-10 16:17:00,144 - use sgd optimizer
+2025-01-10 16:17:00,147 - prepare the schedulers
+2025-01-10 16:17:00,147 - preparing optimizer is done
+2025-01-10 16:17:00,202 - train directory: /cluster/pixstor/xudong-lab/duolin/swiss-pos-512-v2_splitdata/train/
+2025-01-10 16:17:00,202 - valid directory: /cluster/pixstor/xudong-lab/duolin/swiss-pos-512-v2_splitdata/val/
+2025-01-10 16:17:01,464 - preparing dataloaders are done
+2025-01-10 16:17:02,057 - Start contrastive training for 100 steps.
+2025-01-10 16:17:02,058 - Number of train steps per epoch: 8438
+2025-01-10 16:17:02,058 - Training with: cuda and fix_seed = 0
+2025-01-10 16:17:02,058 - Epoch 1
