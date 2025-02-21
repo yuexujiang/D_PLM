@@ -271,7 +271,7 @@ class VIVIT(nn.Module):  # embedding table is fixed
         self.image_processor = VivitImageProcessor.from_pretrained(vivit_pretrain)
         self.model = VivitModel.from_pretrained(vivit_pretrain)
 
-        dim_mlp = self.model.xxxxx
+        dim_mlp = self.model.config.hidden_size
         
         self.projectors_protein = MoBYMLP(in_dim=dim_mlp, inner_dim=protein_inner_dim, out_dim=protein_out_dim,
                                           num_layers=protein_num_projector)
