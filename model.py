@@ -7,6 +7,7 @@ from peft import PeftModel, LoraConfig, get_peft_model
 import gvp.models
 # from gvp import GVP, GVPConvLayer, LayerNorm, tuple_index
 from torch_geometric.nn import radius, global_mean_pool, global_max_pool
+from transformers import VivitImageProcessor, VivitModel
 def set_requires_grad(model, val):
     for p in model.parameters():
         p.requires_grad = val
@@ -253,6 +254,68 @@ class GVPEncoder(nn.Module):  # embedding table can be tuned
             return graph_feature, residue_feature, graph_feature_embedding, residue_feature_embedding
         else:
             return graph_feature, residue_feature
+
+class VIVIT(nn.Module):  # embedding table is fixed
+    def __init__(self, vivit_pretrain, logging,
+                 accelerator,
+                 configs,
+                 residue_inner_dim=4096,
+                 residue_out_dim=256,
+                 protein_out_dim=256,
+                 residue_num_projector=2,
+                 protein_inner_dim=4096, protein_num_projector=2):
+        """
+        unfix_last_layer: the number of layers that can be fine-tuned
+        """
+        super(VIVIT, self).__init__()
+        self.image_processor = VivitImageProcessor.from_pretrained(vivit_pretrain)
+        self.model = VivitModel.from_pretrained(vivit_pretrain)
+
+        dim_mlp = self.model.xxxxx
+        
+        self.projectors_protein = MoBYMLP(in_dim=dim_mlp, inner_dim=protein_inner_dim, out_dim=protein_out_dim,
+                                          num_layers=protein_num_projector)
+
+        self.projectors_residue = MoBYMLP(in_dim=dim_mlp, inner_dim=residue_inner_dim, out_dim=residue_out_dim,
+                                          num_layers=residue_num_projector)
+        
+
+        if hasattr(configs.model.MD_encoder, "fine_tuning") and not configs.model.MD_encoder.fine_tuning.enable:
+            for name, param in self.model.named_parameters():
+                param.requires_grad = False
+
+        if hasattr(configs.model.MD_encoder, "fine_tuning_projct") and not configs.model.MD_encoder.fine_tuning_projct.enable:
+            for name, param in self.projectors_protein.named_parameters():
+                param.requires_grad = False
+            
+            for name, param in self.projectors_residue.named_parameters():
+                param.requires_grad = False
+
+    def forward(self, x, return_logits=False, return_embedding=False):
+        outputs = self.esm2(x, repr_layers=[self.num_layers], return_contacts=False)
+        # print("OKOKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK")
+        if return_logits:
+            prediction_scores = outputs["logits"]
+            return prediction_scores
+        else:
+            residue_feature = outputs['representations'][self.num_layers]
+            # residue_dim = residue_feature.shape #[batch,L,D]
+            # average pooling but remove padding tokens
+            mask = (x != self.alphabet.padding_idx)  # use this in v2 training
+            denom = torch.sum(mask, -1, keepdim=True)
+            graph_feature_embedding = torch.sum(residue_feature * mask.unsqueeze(-1), dim=1) / denom  # remove padding
+            # print("size of graph_feature_embedding is :")
+            # print(len(graph_feature_embedding))
+            graph_feature = self.projectors_protein(graph_feature_embedding)  # the cls and eos token is included
+            mask = ((x != self.alphabet.padding_idx) & (x != self.alphabet.cls_idx) & (
+                    x != self.alphabet.eos_idx))  # use this in v2 training
+            residue_feature_embedding = residue_feature[mask]
+            residue_feature = self.projectors_residue(residue_feature_embedding)
+            # residue_feature = self.projectors_residue(residue_feature.view(-1, residue_dim[-1])).view(residue_dim[0],residue_dim[1],-1)
+            if return_embedding:
+                return graph_feature, residue_feature, graph_feature_embedding, residue_feature_embedding
+            else:
+                return graph_feature, residue_feature
 
 
 class ESM2(nn.Module):  # embedding table is fixed
@@ -1101,6 +1164,14 @@ def prepare_models(logging, configs, accelerator):
                      protein_num_projector=configs.model.protein_num_projector,
                      configs=configs, logging=logging)
     
+    model_MD = VIVIT(configs.model.MD_encoder.model_name,
+                     accelerator=accelerator,
+                     residue_inner_dim=configs.model.MD_encoder.residue_inner_dim,
+                     residue_out_dim=configs.model.residue_out_dim,
+                     protein_out_dim=configs.model.protein_out_dim,
+                     residue_num_projector=configs.model.residue_num_projector,
+                     protein_num_projector=configs.model.protein_num_projector,
+                     configs=configs, logging=logging)
     
     if hasattr(configs.train_settings,"train_lm_head_only"):
             if configs.train_settings.train_lm_head_only is True:
