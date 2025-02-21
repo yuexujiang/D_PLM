@@ -538,13 +538,17 @@ def main(args, dict_configs, config_file_path):
     else:
         masked_lm_data_collator = None
 
-
-    if hasattr(configs.model.struct_encoder,"version") and configs.model.struct_encoder.version == 'v2':
-        from data.data_v2 import prepare_dataloaders as prepare_dataloaders_v2
-        train_loader, val_loader = prepare_dataloaders_v2(logging, accelerator, configs)
+    if configs.model.x_module == 'MD':
+        from data.data_MD import prepare_dataloaders as prepare_dataloaders_v3
+        train_loader = prepare_dataloaders_v2(logging, accelerator, configs)
+        val_loader = prepare_dataloaders_v2(logging, accelerator, configs)
     else:
-        from data.data import prepare_dataloaders
-        train_loader, val_loader = prepare_dataloaders(logging, accelerator, configs)
+        if hasattr(configs.model.struct_encoder,"version") and configs.model.struct_encoder.version == 'v2':
+            from data.data_v2 import prepare_dataloaders as prepare_dataloaders_v2
+            train_loader, val_loader = prepare_dataloaders_v2(logging, accelerator, configs)
+        else:
+            from data.data import prepare_dataloaders
+            train_loader, val_loader = prepare_dataloaders(logging, accelerator, configs)
     
     if accelerator.is_main_process:
         logging.info('preparing dataloaders are done')
