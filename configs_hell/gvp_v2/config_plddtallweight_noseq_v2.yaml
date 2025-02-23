@@ -14,13 +14,14 @@ model:
   protein_out_dim: 256
   residue_num_projector: 1
   protein_num_projector: 2
-  X_module: MD
+  X_module: MD #structure
 
   MD_encoder:
     model_name: google/vivit-b-16x2-kinetics400
     residue_inner_dim: 1024
+    protein_inner_dim: 4096
     fine_tuning:
-         enable: True
+         enable: False
   esm_encoder:
     model_name:  esm2_t33_650M_UR50D # esm2_t33_650M_UR50D, esm2_t30_150M_UR50D, esm2_t12_35M_UR50D, esm2_t6_8M_UR50D
     max_length: 512
@@ -106,6 +107,7 @@ optimizer:
   name: sgd
   lr_seq: 0.01
   lr_struct: 0.00001
+  lr_MD: 0.0001
   weight_decouple: True
   weight_decay: 0.0005
   eps: 1e-16
@@ -117,5 +119,6 @@ optimizer:
     warmup: 10
     min_lr_seq: 0
     min_lr_struct: 0
+    min_lr_MD: 0
     gamma: 1
     first_cycle_steps: 2000

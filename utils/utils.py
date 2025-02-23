@@ -329,16 +329,21 @@ def save_structpretrain_checkpoints(optimizer_struct, result_path, model, n_step
 
 
 
-def load_optimizers(model_seq, model_struct, logging, configs):
+def load_optimizers(model_seq, model_x, logging, configs):
     optimizer_seq=None
-    optimizer_struct=None
+    optimizer_x=None
     if configs.optimizer.name.lower() == 'adabelief':
         if model_seq is not None:
             optimizer_seq = optim.AdaBelief(model_seq.parameters(), lr=configs.optimizer.lr_seq, eps=configs.optimizer.eps,
                                         decoupled_decay=True,
                                         weight_decay=configs.optimizer.weight_decay, rectify=False)
-        if model_struct is not None:
-            optimizer_struct = optim.AdaBelief(model_struct.parameters(), lr=configs.optimizer.lr_struct,
+        if model_x is not None and configs.model.X_module=="structure":
+            optimizer_x = optim.AdaBelief(model_x.parameters(), lr=configs.optimizer.lr_struct,
+                                           eps=configs.optimizer.eps,
+                                           decoupled_decay=True,
+                                           weight_decay=configs.optimizer.weight_decay, rectify=False)
+        if model_x is not None and configs.model.X_module=="MD":
+            optimizer_x = optim.AdaBelief(model_x.parameters(), lr=configs.optimizer.lr_MD,
                                            eps=configs.optimizer.eps,
                                            decoupled_decay=True,
                                            weight_decay=configs.optimizer.weight_decay, rectify=False)
@@ -353,9 +358,16 @@ def load_optimizers(model_seq, model_struct, logging, configs):
                 weight_decay=float(configs.optimizer.weight_decay),
                 eps=float(configs.optimizer.eps),
              )
-            if model_struct is not None:
-              optimizer_struct = bitsandbytes.optim.AdamW8bit(
-                model_struct.parameters(), lr=float(configs.optimizer.lr_struct),
+            if model_x is not None and configs.model.X_module=="structure":
+              optimizer_x = bitsandbytes.optim.AdamW8bit(
+                model_x.parameters(), lr=float(configs.optimizer.lr_struct),
+                betas=(configs.optimizer.beta_1, configs.optimizer.beta_2),
+                weight_decay=float(configs.optimizer.weight_decay),
+                eps=float(configs.optimizer.eps),
+              )
+            if model_x is not None and configs.model.X_module=="MD":
+              optimizer_x = bitsandbytes.optim.AdamW8bit(
+                model_x.parameters(), lr=float(configs.optimizer.lr_MD),
                 betas=(configs.optimizer.beta_1, configs.optimizer.beta_2),
                 weight_decay=float(configs.optimizer.weight_decay),
                 eps=float(configs.optimizer.eps),
@@ -368,17 +380,21 @@ def load_optimizers(model_seq, model_struct, logging, configs):
                 weight_decay=float(configs.optimizer.weight_decay),
                 eps=float(configs.optimizer.eps)
               )
-            if model_struct is not None:
-              optimizer_struct = torch.optim.AdamW(
-                model_struct.parameters(), lr=float(configs.optimizer.lr_struct),
+            if model_x is not None and configs.model.X_module=="structure":
+              optimizer_x = torch.optim.AdamW(
+                model_x.parameters(), lr=float(configs.optimizer.lr_MD),
                 betas=(configs.optimizer.beta_1, configs.optimizer.beta_2),
                 weight_decay=float(configs.optimizer.weight_decay),
                 eps=float(configs.optimizer.eps)
               )
     elif configs.optimizer.name.lower() == 'sgd':
         logging.info('use sgd optimizer')
-        if model_struct is not None:
-            optimizer_struct = torch.optim.SGD(model_struct.parameters(), lr=float(configs.optimizer.lr_struct),
+        if model_x is not None and configs.model.X_module=="structure":
+            optimizer_x = torch.optim.SGD(model_x.parameters(), lr=float(configs.optimizer.lr_struct),
+                                           momentum=0.9, dampening=0,
+                                           weight_decay=float(configs.optimizer.weight_decay))
+        if model_x is not None and configs.model.X_module=="MD":
+            optimizer_x = torch.optim.SGD(model_x.parameters(), lr=float(configs.optimizer.lr_MD),
                                            momentum=0.9, dampening=0,
                                            weight_decay=float(configs.optimizer.weight_decay))
         if model_seq is not None:
@@ -387,25 +403,34 @@ def load_optimizers(model_seq, model_struct, logging, configs):
 
     else:
         raise ValueError('wrong optimizer')
-    return optimizer_seq, optimizer_struct
+    return optimizer_seq, optimizer_x
 
 
-def prepare_optimizer(model_seq, model_struct, logging, configs):
+def prepare_optimizer(model_seq, model_x, logging, configs):
     logging.info("prepare the optimizers")
-    optimizer_seq, optimizer_struct = load_optimizers(model_seq, model_struct, logging, configs)
-    scheduler_seq,scheduler_struct= None,None
+    optimizer_seq, optimizer_x = load_optimizers(model_seq, model_x, logging, configs)
+    scheduler_seq, scheduler_x= None,None
     #print(optimizer_seq.param_groups[0].keys())
     #print(optimizer_struct.param_groups[0].keys())
 
     logging.info("prepare the schedulers")
     # if configs.optimizer.name.lower() != 'sgd':
-    if model_struct is not None:
-      scheduler_struct = CosineAnnealingWarmupRestarts(
-        optimizer_struct,
+    if model_x is not None and configs.model.X_module=="structure":
+      scheduler_x = CosineAnnealingWarmupRestarts(
+        optimizer_x,
         first_cycle_steps=configs.optimizer.decay.first_cycle_steps,
         cycle_mult=1.0,
         max_lr=configs.optimizer.lr_struct,
         min_lr=configs.optimizer.decay.min_lr_struct,
+        warmup_steps=configs.optimizer.decay.warmup,
+        gamma=configs.optimizer.decay.gamma)
+    if model_x is not None and configs.model.X_module=="MD":
+      scheduler_x = CosineAnnealingWarmupRestarts(
+        optimizer_x,
+        first_cycle_steps=configs.optimizer.decay.first_cycle_steps,
+        cycle_mult=1.0,
+        max_lr=configs.optimizer.lr_MD,
+        min_lr=configs.optimizer.decay.min_lr_MD,
         warmup_steps=configs.optimizer.decay.warmup,
         gamma=configs.optimizer.decay.gamma)
     if model_seq is not None:
@@ -422,7 +447,7 @@ def prepare_optimizer(model_seq, model_struct, logging, configs):
     #    scheduler_struct = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer_struct, configs.optimizer.decay.T0, configs.optimizer.decay.Tmult)
     #    scheduler_seq = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer_seq, configs.optimizer.decay.T0, configs.optimizer.decay.Tmult)
 
-    return scheduler_seq, scheduler_struct, optimizer_seq, optimizer_struct
+    return scheduler_seq, scheduler_x, optimizer_seq, optimizer_x
 
 
 def plot_learning_rate(scheduler, optimizer, num_steps, filename):
