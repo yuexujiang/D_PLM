@@ -7,7 +7,7 @@ from peft import PeftModel, LoraConfig, get_peft_model
 import gvp.models
 # from gvp import GVP, GVPConvLayer, LayerNorm, tuple_index
 from torch_geometric.nn import radius, global_mean_pool, global_max_pool
-from transformers import VivitImageProcessor, VivitModel
+from transformers import VivitModel
 def set_requires_grad(model, val):
     for p in model.parameters():
         p.requires_grad = val
@@ -268,7 +268,7 @@ class VIVIT(nn.Module):  # embedding table is fixed
         unfix_last_layer: the number of layers that can be fine-tuned
         """
         super(VIVIT, self).__init__()
-        self.image_processor = VivitImageProcessor.from_pretrained(vivit_pretrain)
+        # self.image_processor = VivitImageProcessor.from_pretrained(vivit_pretrain)
         self.model = VivitModel.from_pretrained(vivit_pretrain)
 
         dim_mlp = self.model.config.hidden_size
@@ -292,30 +292,21 @@ class VIVIT(nn.Module):  # embedding table is fixed
                 param.requires_grad = False
 
     def forward(self, x, return_logits=False, return_embedding=False):
-        outputs = self.esm2(x, repr_layers=[self.num_layers], return_contacts=False)
+        outputs = self.model(x)
         # print("OKOKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK")
         if return_logits:
-            prediction_scores = outputs["logits"]
-            return prediction_scores
+            # prediction_scores = outputs["logits"]
+            # return prediction_scores
+            print("print something")
         else:
-            residue_feature = outputs['representations'][self.num_layers]
-            # residue_dim = residue_feature.shape #[batch,L,D]
-            # average pooling but remove padding tokens
-            mask = (x != self.alphabet.padding_idx)  # use this in v2 training
-            denom = torch.sum(mask, -1, keepdim=True)
-            graph_feature_embedding = torch.sum(residue_feature * mask.unsqueeze(-1), dim=1) / denom  # remove padding
-            # print("size of graph_feature_embedding is :")
-            # print(len(graph_feature_embedding))
-            graph_feature = self.projectors_protein(graph_feature_embedding)  # the cls and eos token is included
-            mask = ((x != self.alphabet.padding_idx) & (x != self.alphabet.cls_idx) & (
-                    x != self.alphabet.eos_idx))  # use this in v2 training
-            residue_feature_embedding = residue_feature[mask]
-            residue_feature = self.projectors_residue(residue_feature_embedding)
-            # residue_feature = self.projectors_residue(residue_feature.view(-1, residue_dim[-1])).view(residue_dim[0],residue_dim[1],-1)
-            if return_embedding:
-                return graph_feature, residue_feature, graph_feature_embedding, residue_feature_embedding
-            else:
-                return graph_feature, residue_feature
+            last_hidden_states = outputs.last_hidden_state # [batch, 3137, 768]
+            cls_representation = last_hidden_states[:, 0, :] # [batch, 768]
+            graph_feature = self.projectors_protein(cls_representation)
+
+        if return_embedding:
+            return graph_feature, cls_representation
+        else:
+            return graph_feature
 
 
 class ESM2(nn.Module):  # embedding table is fixed
@@ -579,30 +570,50 @@ class MaskedLMDataCollator:
 
 
 class SimCLR(nn.Module):
-    def __init__(self, model_seq, model_struct, configs):
+    def __init__(self, model_seq, model_x, configs):
         super(SimCLR, self).__init__()
         self.model_seq = model_seq
-        self.model_struct = model_struct
+        self.model_x = model_x
+        # if configs.model.X_module == "structure":
+            # self.model_struct = model_x
+        # elif configs.model.X_module == "MD":
+            # self.model_MD = model_x
         self.temperature = configs.train_settings.temperature
         self.n_views = configs.train_settings.n_views
+        self.configs = configs
 
     def forward(self, graph=None, batch_tokens=None, mode=False, return_embedding=False,return_logits=False):
         if mode == 'sequence':
             return self.model_seq(batch_tokens, return_embedding=return_embedding,return_logits=return_logits)
         elif mode == 'structure':
-            return self.model_struct(graph, return_embedding=return_embedding)
+            return self.model_x(graph, return_embedding=return_embedding)
+        elif mode =="MD":
+            return self.model_x(graph)
         else:
-            features_seq, residue_seq = self.model_seq(batch_tokens)
-            features_struct, residue_struct = self.model_struct(graph)
-            return features_struct, residue_struct, features_seq, residue_seq
-
-    def forward_structure(self, graph):
-        features_struct, residue_struct = self.model_struct(graph)
-        return features_struct, residue_struct
+            if self.configs.model.X_module == "structure":
+                features_seq, residue_seq = self.model_seq(batch_tokens)
+                features_struct, residue_struct = self.model_x(graph)
+                return features_struct, residue_struct, features_seq, residue_seq
+            if self.configs.model.X_module == "MD":
+                features_seq, residue_seq = self.model_seq(batch_tokens)
+                features_MD = self.model_x(graph)
+                return features_MD, features_seq, residue_seq
+        
+    # def forward_structure(self, graph):
+    #     features_struct, residue_struct = self.model_struct(graph)
+    #     return features_struct, residue_struct
 
     def forward_sequence(self, batch_tokens):
         features_seq, residue_seq = self.model_seq(batch_tokens)
         return features_seq, residue_seq
+    
+    def forward_x(self, graph):
+        if self.configs.model.X_module == "structure":
+            features_struct, residue_struct = self.model_x(graph)
+            return features_struct, residue_struct
+        if self.configs.model.X_module == "MD":
+            features_MD = self.model_x(graph)
+            return features_MD
 
 
 class GVP_CLASSIFICATION(nn.Module):
@@ -1186,7 +1197,11 @@ def prepare_models(logging, configs, accelerator):
         print_trainable_parameters(model_seq, logging)
         print_trainable_parameters(model_struct, logging)
 
-    simclr = SimCLR(model_seq, model_struct, configs=configs)
+    if configs.model.X_module == "MD":
+        simclr = SimCLR(model_seq, model_MD, configs=configs)
+    elif configs.model.X_module == "structure":
+        simclr = SimCLR(model_seq, model_struct, configs=configs)
+    
     return simclr  # model_seq, model_struct #, new_model
 
 def prepare_gvp_contrastive_learning_model(logging, configs, accelerator):
