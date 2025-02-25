@@ -2,6 +2,7 @@ fix_seed: 0
 checkpoints_every: 10000
 tensorboard_log: True
 result_path: ./results/test
+HF_cache_path: ./HF_cashe_path
 
 resume:
   resume: False
@@ -22,6 +23,8 @@ model:
     protein_inner_dim: 4096
     fine_tuning:
          enable: False
+    fine_tuning_projct:
+         enable: True
   esm_encoder:
     model_name:  esm2_t33_650M_UR50D # esm2_t33_650M_UR50D, esm2_t30_150M_UR50D, esm2_t12_35M_UR50D, esm2_t6_8M_UR50D
     max_length: 512
@@ -75,7 +78,7 @@ model:
         checkpoint_path: path/to/checkpoints.pth
 
 train_settings:
-  MD_data_path: ./MD/dev_data/
+  MD_data_path: ./data/MD/dev_data/
   data_path: /cluster/pixstor/xudong-lab/duolin/swiss-pos-512-v2_splitdata/train/
   num_steps: 100 #10000000
   shuffle: True
