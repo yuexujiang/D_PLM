@@ -5,7 +5,6 @@ import numpy as np
 import math
 from Bio.PDB import PDBParser, PPBuilder
 from torch.utils.data import Dataset
-import webdataset as wds
 from torch.utils.data import DataLoader
 from transformers import VivitImageProcessor
 
@@ -31,7 +30,7 @@ def custom_collate(batch):
     return batched_data
 
 def prepare_dataloaders(configs):
-    samples = prepare_samples(configs.train_settings.MD_data_path, configs.model.MD_encoder.model_name)
+    samples = prepare_samples(configs.train_settings.MD_data_path, configs.model.MD_encoder.model_name, configs.HF_cache_path)
     dataset = ProteinMDDataset(samples, configs=configs, mode = "train")
     dataloader = DataLoader(dataset, batch_size=configs.train_settings.batch_size, shuffle=True, collate_fn=custom_collate,drop_last=False)
     return dataloader
@@ -94,8 +93,8 @@ def normalize_contact_map(contact_map):
     normalized_map = np.clip(normalized_map, 0, 1)
     return normalized_map
 
-def prepare_samples(data_folder2search, model_name):
-    image_processor = VivitImageProcessor.from_pretrained(model_name)
+def prepare_samples(data_folder2search, model_name, cache_path):
+    image_processor = VivitImageProcessor.from_pretrained(model_name, cache_dir=cache_path)
     # Specify the parent folder (folder A)
     folder_A = data_folder2search
     samples = []
@@ -136,7 +135,8 @@ def prepare_samples(data_folder2search, model_name):
                     if len(contact_maps) == 32:
                         break  # make contact_maps contain 32 frames # [32, N, N, 3]
                 
-                input_traj = image_processor(contact_maps, return_tensors="pt") # [1, 32, 3, 224, 224]
+                traj = image_processor(contact_maps, return_tensors="pt") # [1, 32, 3, 224, 224]
+                input_traj = traj['pixel_values']
                 samples.append((pid, sequence, input_traj))
     return samples
 

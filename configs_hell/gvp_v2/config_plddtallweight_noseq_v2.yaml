@@ -2,6 +2,7 @@ fix_seed: 0
 checkpoints_every: 10000
 tensorboard_log: True
 result_path: ./results/test
+HF_cache_path: ./HF_cashe_path
 
 resume:
   resume: False
