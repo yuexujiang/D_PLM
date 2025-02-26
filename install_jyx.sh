@@ -12,7 +12,7 @@ pip install matplotlib
 pip install accelerate
 pip install transformers
 pip install timm
-pip install 'git+https://github.com/katsura-jp/pytorch-cosine-annealing-with-warmup'
+pip install git+https://github.com/katsura-jp/pytorch-cosine-annealing-with-warmup
 pip install tensorboard
 pip install python-box
 pip install pandas
@@ -24,3 +24,5 @@ pip install torch_geometric
 pip install h5py
 pip install scipy
 pip install openpyxl
+pip install mdtraj
+pip install biopython

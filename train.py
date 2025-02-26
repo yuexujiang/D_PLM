@@ -744,9 +744,9 @@ def main(args, dict_configs, config_file_path):
         masked_lm_data_collator = None
 
     if configs.model.X_module == 'MD':
-        from data.data_MD import prepare_dataloaders as prepare_dataloaders_v3
-        train_loader = prepare_dataloaders_v2(logging, accelerator, configs)
-        val_loader = prepare_dataloaders_v2(logging, accelerator, configs)
+        from data.data_MD import prepare_dataloaders as prepare_dataloaders_v2
+        train_loader = prepare_dataloaders_v2(configs)
+        val_loader = prepare_dataloaders_v2(configs)
     else:
         if hasattr(configs.model.struct_encoder,"version") and configs.model.struct_encoder.version == 'v2':
             from data.data_v2 import prepare_dataloaders as prepare_dataloaders_v2
