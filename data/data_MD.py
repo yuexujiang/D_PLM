@@ -2,6 +2,7 @@ import torch
 import os
 import mdtraj as md
 import numpy as np
+import math
 from Bio.PDB import PDBParser, PPBuilder
 from torch.utils.data import Dataset
 import webdataset as wds
