@@ -269,7 +269,7 @@ class VIVIT(nn.Module):  # embedding table is fixed
         """
         super(VIVIT, self).__init__()
         # self.image_processor = VivitImageProcessor.from_pretrained(vivit_pretrain)
-        self.model = VivitModel.from_pretrained(vivit_pretrain)
+        self.model = VivitModel.from_pretrained(vivit_pretrain, cache_dir=configs.HF_cache_path)
 
         dim_mlp = self.model.config.hidden_size
         
