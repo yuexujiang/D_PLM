@@ -19,13 +19,13 @@ class ProteinMDDataset(Dataset):
 
 
 def custom_collate(batch):
-    pid, seq, traj = zip(*batch)
+    pid, seq, trajs = zip(*batch)
     # Remove the extra dimension from each contact sample
-    contacts = [contact.squeeze(0) for contact in traj]
-    # Now each contact has shape [32, 3, 224, 224]
+    traj_list = [traj.squeeze(0) for traj in trajs]
+    # Now each traj has shape [32, 3, 224, 224]
     # Stack them along a new first dimension (batch dimension)
-    contacts = torch.stack(contacts, dim=0)
-    batched_data = {'pid': pid, 'seq': seq, 'traj': contacts}
+    traj_batch = torch.stack(traj_list, dim=0)
+    batched_data = {'pid': pid, 'seq': seq, 'traj': traj_batch}
     # return pid, seq, contacts
     return batched_data
 
@@ -135,7 +135,7 @@ def prepare_samples(data_folder2search, model_name, cache_path):
                     if len(contact_maps) == 32:
                         break  # make contact_maps contain 32 frames # [32, N, N, 3]
                 
-                traj = image_processor(contact_maps, return_tensors="pt") # [1, 32, 3, 224, 224]
+                traj = image_processor(contact_maps, return_tensors="pt", do_rescale=False, offset=False) # [1, 32, 3, 224, 224]
                 input_traj = traj['pixel_values']
                 samples.append((pid, sequence, input_traj))
     return samples
