@@ -348,45 +348,20 @@ def load_optimizers(model_seq, model_x, logging, configs):
                                            decoupled_decay=True,
                                            weight_decay=configs.optimizer.weight_decay, rectify=False)
     elif configs.optimizer.name.lower() == 'adam':
-        if configs.optimizer.use_8bit_adam:
-            import bitsandbytes
-            logging.info('use 8-bit adamw')
-            if model_seq is not None:
-             optimizer_seq = bitsandbytes.optim.AdamW8bit(
-                model_seq.parameters(), lr=float(configs.optimizer.lr_seq),
-                betas=(configs.optimizer.beta_1, configs.optimizer.beta_2),
-                weight_decay=float(configs.optimizer.weight_decay),
-                eps=float(configs.optimizer.eps),
-             )
-            if model_x is not None and configs.model.X_module=="structure":
-              optimizer_x = bitsandbytes.optim.AdamW8bit(
-                model_x.parameters(), lr=float(configs.optimizer.lr_struct),
-                betas=(configs.optimizer.beta_1, configs.optimizer.beta_2),
-                weight_decay=float(configs.optimizer.weight_decay),
-                eps=float(configs.optimizer.eps),
-              )
-            if model_x is not None and configs.model.X_module=="MD":
-              optimizer_x = bitsandbytes.optim.AdamW8bit(
-                model_x.parameters(), lr=float(configs.optimizer.lr_MD),
-                betas=(configs.optimizer.beta_1, configs.optimizer.beta_2),
-                weight_decay=float(configs.optimizer.weight_decay),
-                eps=float(configs.optimizer.eps),
-              )
-        else:
-            if model_seq is not None:
-              optimizer_seq = torch.optim.AdamW(
-                model_seq.parameters(), lr=float(configs.optimizer.lr_seq),
-                betas=(configs.optimizer.beta_1, configs.optimizer.beta_2),
-                weight_decay=float(configs.optimizer.weight_decay),
-                eps=float(configs.optimizer.eps)
-              )
-            if model_x is not None and configs.model.X_module=="structure":
-              optimizer_x = torch.optim.AdamW(
-                model_x.parameters(), lr=float(configs.optimizer.lr_MD),
-                betas=(configs.optimizer.beta_1, configs.optimizer.beta_2),
-                weight_decay=float(configs.optimizer.weight_decay),
-                eps=float(configs.optimizer.eps)
-              )
+        if model_seq is not None:
+          optimizer_seq = torch.optim.AdamW(
+            model_seq.parameters(), lr=float(configs.optimizer.lr_seq),
+            betas=(configs.optimizer.beta_1, configs.optimizer.beta_2),
+            weight_decay=float(configs.optimizer.weight_decay),
+            eps=float(configs.optimizer.eps)
+          )
+        if model_x is not None and configs.model.X_module=="structure":
+          optimizer_x = torch.optim.AdamW(
+            model_x.parameters(), lr=float(configs.optimizer.lr_MD),
+            betas=(configs.optimizer.beta_1, configs.optimizer.beta_2),
+            weight_decay=float(configs.optimizer.weight_decay),
+            eps=float(configs.optimizer.eps)
+          )
     elif configs.optimizer.name.lower() == 'sgd':
         logging.info('use sgd optimizer')
         if model_x is not None and configs.model.X_module=="structure":

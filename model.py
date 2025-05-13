@@ -407,17 +407,6 @@ class ESM2(nn.Module):  # embedding table is fixed
                 for p in self.esm2.emb_layer_norm_after.parameters():
                     p.requires_grad = True
 
-        if configs.model.esm_encoder.tune_ESM_table:
-            if accelerator.is_main_process:
-                logging.info("fine-tune esm embedding parameters")
-            for p in self.esm2.embed_tokens.parameters():
-                p.requires_grad = True
-        
-        if hasattr(configs.model.esm_encoder, "MLM"):
-            if configs.model.esm_encoder.MLM.enable and configs.model.esm_encoder.MLM.mode == "predict":
-                for p in self.esm2.lm_head.parameters():
-                    p.requires_grad = True
-
         self.pool_mode = configs.model.esm_encoder.pool_mode
         # if self.pool_mode == 3:
         #     self.pe = get_embedding(self.esm2.embed_dim, configs.model.esm_encoder.max_length + 2).to(
@@ -1157,13 +1146,7 @@ def prepare_gvppretrain_model(logging,configs,accelerator):
 
 
 def prepare_models(logging, configs, accelerator):
-    model_struct = GVPEncoder(configs=configs, residue_inner_dim=configs.model.struct_encoder.residue_inner_dim,
-                              residue_out_dim=configs.model.residue_out_dim,
-                              protein_out_dim=configs.model.protein_out_dim,
-                              protein_inner_dim=configs.model.struct_encoder.protein_inner_dim,
-                              residue_num_projector=configs.model.residue_num_projector,
-                              protein_num_projector=configs.model.protein_num_projector,
-                              seqlen=configs.model.esm_encoder.max_length)
+    
     
     # Use ESM2 for sequence
     model_seq = ESM2(configs.model.esm_encoder.model_name,
@@ -1174,8 +1157,9 @@ def prepare_models(logging, configs, accelerator):
                      residue_num_projector=configs.model.residue_num_projector,
                      protein_num_projector=configs.model.protein_num_projector,
                      configs=configs, logging=logging)
-    
-    model_MD = VIVIT(configs.model.MD_encoder.model_name,
+
+    if configs.model.X_module == "MD":
+        model_MD = VIVIT(configs.model.MD_encoder.model_name,
                      accelerator=accelerator,
                      residue_inner_dim=configs.model.MD_encoder.residue_inner_dim,
                      residue_out_dim=configs.model.residue_out_dim,
@@ -1183,24 +1167,26 @@ def prepare_models(logging, configs, accelerator):
                      residue_num_projector=configs.model.residue_num_projector,
                      protein_num_projector=configs.model.protein_num_projector,
                      configs=configs, logging=logging)
-    
-    if hasattr(configs.train_settings,"train_lm_head_only"):
-            if configs.train_settings.train_lm_head_only is True:
-                for name, param in model_struct.named_parameters():
-                    param.requires_grad = False
-                for name, param in model_seq.named_parameters():
-                    param.requires_grad = False
-                for p in model_seq.esm2.lm_head.parameters():
-                        p.requires_grad = True #will open esm2.embed_tokens.weight!
-    
-    if accelerator.is_main_process:
-        print_trainable_parameters(model_seq, logging)
-        print_trainable_parameters(model_struct, logging)
-
-    if configs.model.X_module == "MD":
+        
+        if accelerator.is_main_process:
+          print_trainable_parameters(model_seq, logging)
+          print_trainable_parameters(model_MD, logging)
+        
         simclr = SimCLR(model_seq, model_MD, configs=configs)
     elif configs.model.X_module == "structure":
+        model_struct = GVPEncoder(configs=configs, residue_inner_dim=configs.model.struct_encoder.residue_inner_dim,
+                              residue_out_dim=configs.model.residue_out_dim,
+                              protein_out_dim=configs.model.protein_out_dim,
+                              protein_inner_dim=configs.model.struct_encoder.protein_inner_dim,
+                              residue_num_projector=configs.model.residue_num_projector,
+                              protein_num_projector=configs.model.protein_num_projector,
+                              seqlen=configs.model.esm_encoder.max_length)
+        
         simclr = SimCLR(model_seq, model_struct, configs=configs)
+
+        if accelerator.is_main_process:
+          print_trainable_parameters(model_seq, logging)
+          print_trainable_parameters(model_struct, logging)
     
     return simclr  # model_seq, model_struct #, new_model
 
