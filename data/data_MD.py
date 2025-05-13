@@ -5,7 +5,7 @@ import numpy as np
 import math
 from Bio.PDB import PDBParser, PPBuilder
 from torch.utils.data import Dataset
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, random_split
 from transformers import VivitImageProcessor
 
 class ProteinMDDataset(Dataset):
@@ -30,10 +30,58 @@ def custom_collate(batch):
     return batched_data
 
 def prepare_dataloaders(configs):
-    samples = prepare_samples(configs.train_settings.MD_data_path, configs.model.MD_encoder.model_name, configs.HF_cache_path)
-    dataset = ProteinMDDataset(samples, configs=configs, mode = "train")
-    dataloader = DataLoader(dataset, batch_size=configs.train_settings.batch_size, shuffle=True, collate_fn=custom_collate,drop_last=False)
-    return dataloader
+    samples = prepare_samples(configs.train_settings.Atlas_data_path, 
+                              configs.model.MD_encoder.model_name, 
+                              configs.HF_cache_path)
+    total_samples = len(samples)
+    val_size = int(total_samples * 0.1)
+    test_size = int(total_samples * 0.1)
+    train_size = total_samples - val_size - test_size
+    train_samples, val_samples, test_samples = random_split(samples, [train_size, val_size, test_size])
+
+    samples_hard = prepare_samples(configs.train_settings.Atlas_test_path, 
+                              configs.model.MD_encoder.model_name, 
+                              configs.HF_cache_path)
+    hard_num = len(samples_hard)
+    val_size = int(hard_num * 0.5)
+    test_size = hard_num - val_size
+    val_hard, test_hard = random_split(samples_hard, [val_size, test_size])
+    val_samples = val_samples + val_hard
+    test_samples = test_samples + test_hard
+
+
+    print(f"train samples: {len(train_samples)}, val samples: {len(val_samples)}, test samples: {len(test_samples)}")
+    # Create DataLoader for each split
+    train_dataset = ProteinMDDataset(train_samples, configs=configs, mode="train")
+    train_dataloader = DataLoader(
+        train_dataset,
+        batch_size=configs.train_settings.batch_size,
+        shuffle=True,
+        collate_fn=custom_collate,
+        drop_last=False
+    )
+
+    val_dataset = ProteinMDDataset(val_samples, configs=configs, mode="val")
+    val_dataloader = DataLoader(
+        val_dataset,
+        batch_size=configs.train_settings.batch_size,
+        shuffle=False,  # No need to shuffle validation data
+        collate_fn=custom_collate,
+        drop_last=False
+    )
+
+    test_dataset = ProteinMDDataset(test_samples, configs=configs, mode="val")
+    test_dataloader = DataLoader(
+        test_dataset,
+        batch_size=configs.train_settings.batch_size,
+        shuffle=False,  # No need to shuffle validation data
+        collate_fn=custom_collate,
+        drop_last=False
+    )
+
+    # dataset = ProteinMDDataset(samples, configs=configs, mode = "train")
+    # dataloader = DataLoader(dataset, batch_size=configs.train_settings.batch_size, shuffle=True, collate_fn=custom_collate,drop_last=False)
+    return train_dataloader, val_dataloader, test_dataloader
 
 
 

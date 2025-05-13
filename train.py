@@ -711,16 +711,6 @@ def main(args, dict_configs, config_file_path):
     if accelerator.is_main_process:
         logging.info('preparing model is done')
     
-    
-    # if configs.model.X_module == 'MD':
-    #     scheduler_seq, scheduler_MD, optimizer_seq, optimizer_MD = prepare_optimizer(
-    #     simclr.model_seq, simclr.model_MD, logging, configs
-    # )
-    # elif configs.model.X_module == 'structure':
-    #     scheduler_seq, scheduler_struct, optimizer_seq, optimizer_struct = prepare_optimizer(
-    #     simclr.model_seq, simclr.model_struct, logging, configs
-    # )
-    
     scheduler_seq, scheduler_x, optimizer_seq, optimizer_x = prepare_optimizer(
         simclr.model_seq, simclr.model_x, logging, configs
     )
