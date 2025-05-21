@@ -6,7 +6,11 @@ import math
 from Bio.PDB import PDBParser, PPBuilder
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader, random_split
-from transformers import VivitImageProcessor
+from transformers import VivitImageProcessor, VivitModel
+import h5py
+from .utils import get_gpu_usage_smi, get_memory_usage_gb
+import argparse
+
 
 class ProteinMDDataset(Dataset):
     def __init__(self, samples, configs,mode="train"):
@@ -38,7 +42,6 @@ def prepare_dataloaders(configs):
     test_size = int(total_samples * 0.1)
     train_size = total_samples - val_size - test_size
     train_samples, val_samples, test_samples = random_split(samples, [train_size, val_size, test_size])
-
     samples_hard = prepare_samples(configs.train_settings.Atlas_test_path, 
                               configs.model.MD_encoder.model_name, 
                               configs.HF_cache_path)
@@ -48,8 +51,6 @@ def prepare_dataloaders(configs):
     val_hard, test_hard = random_split(samples_hard, [val_size, test_size])
     val_samples = val_samples + val_hard
     test_samples = test_samples + test_hard
-
-
     print(f"train samples: {len(train_samples)}, val samples: {len(val_samples)}, test samples: {len(test_samples)}")
     # Create DataLoader for each split
     train_dataset = ProteinMDDataset(train_samples, configs=configs, mode="train")
@@ -60,7 +61,6 @@ def prepare_dataloaders(configs):
         collate_fn=custom_collate,
         drop_last=False
     )
-
     val_dataset = ProteinMDDataset(val_samples, configs=configs, mode="val")
     val_dataloader = DataLoader(
         val_dataset,
@@ -69,7 +69,6 @@ def prepare_dataloaders(configs):
         collate_fn=custom_collate,
         drop_last=False
     )
-
     test_dataset = ProteinMDDataset(test_samples, configs=configs, mode="val")
     test_dataloader = DataLoader(
         test_dataset,
@@ -78,40 +77,41 @@ def prepare_dataloaders(configs):
         collate_fn=custom_collate,
         drop_last=False
     )
-
     # dataset = ProteinMDDataset(samples, configs=configs, mode = "train")
     # dataloader = DataLoader(dataset, batch_size=configs.train_settings.batch_size, shuffle=True, collate_fn=custom_collate,drop_last=False)
     return train_dataloader, val_dataloader, test_dataloader
 
 
 
-def vector_to_contact_map(vec):
+def vectors_to_contact_maps(vecs):
     """
-    Converts a vector of pairwise contact values into a symmetric contact map matrix.
+    Converts multiple vectors of pairwise contact values into symmetric contact map matrices.
     
     Args:
-        vec (np.ndarray): 1D array of length L, where L = N*(N-1)/2.
+        vecs (np.ndarray): 2D array of shape (n, L),
+                           where L = N*(N-1)/2 and n is number of vectors.
     
     Returns:
-        contact_map (np.ndarray): 2D symmetric array of shape (N, N).
+        contact_maps (np.ndarray): 3D array of shape (n, N, N).
     """
-    num_pairs = vec.shape[0]
-    # Calculate N using the quadratic formula: N = (1 + sqrt(1+8L)) / 2
+    n, num_pairs = vecs.shape
+    # 计算N
     N = int((1 + math.sqrt(1 + 8 * num_pairs)) / 2)
     
-    # Initialize an empty contact map matrix
-    contact_map = np.zeros((N, N))
+    # 初始化输出数组
+    contact_maps = np.zeros((n, N, N), dtype=vecs.dtype)
     
-    # Get indices for the upper triangle (excluding the diagonal)
+    # 获取上三角索引（不包括对角线）
     triu_indices = np.triu_indices(N, k=1)
     
-    # Fill the upper triangle with the vector values
-    contact_map[triu_indices] = vec
+    # 给所有矩阵的上三角赋值
+    contact_maps[:, triu_indices[0], triu_indices[1]] = vecs
     
-    # Mirror the upper triangle to the lower triangle to make it symmetric
-    contact_map = contact_map + contact_map.T
+    # 镜像到下三角，使矩阵对称
+    contact_maps = contact_maps + np.transpose(contact_maps, (0, 2, 1))
     
-    return contact_map
+    return contact_maps
+    
 
 def pdb2seq(pdb_path):
     # Create a PDB parser object
@@ -141,53 +141,252 @@ def normalize_contact_map(contact_map):
     normalized_map = np.clip(normalized_map, 0, 1)
     return normalized_map
 
-def prepare_samples(data_folder2search, model_name, cache_path):
-    image_processor = VivitImageProcessor.from_pretrained(model_name, cache_dir=cache_path)
+def prepare_samples():
+    return 0
+
+def process_samples(data_folder2search, model_name, sub_list, output_folder):
+    image_processor = VivitImageProcessor.from_pretrained(model_name)
+    model = VivitModel.from_pretrained(model_name)
     # Specify the parent folder (folder A)
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = VivitModel.from_pretrained(model_name).to(device)
     folder_A = data_folder2search
     samples = []
     
     # Iterate through each subfolder under folder_A
+    #data={}
     for subfolder in os.listdir(folder_A):
-        subfolder_path = os.path.join(folder_A, subfolder)
+        subfolder_path = os.path.abspath(os.path.join(folder_A, subfolder))
         
         # Check if the path is a directory
-        if os.path.isdir(subfolder_path):
-            num_xtc=0
-            num_pdb=0
-
+        if os.path.isdir(subfolder_path) and subfolder_path in sub_list:
+            traj_files=[]
             for file_name in os.listdir(subfolder_path):
                 if file_name.endswith(".xtc"):
                     file_xtc_path = os.path.join(subfolder_path, file_name)
-                    num_xtc += 1
+                    traj_files.append(file_xtc_path)
+                    # num_xtc += 1
                 elif file_name.endswith(".pdb"):
                     file_pdb_path = os.path.join(subfolder_path, file_name)
                     pid = file_name.split(".")[0]
-                    num_pdb += 1
+                    # num_pdb += 1
+            print(pid)
+            sequence = pdb2seq(file_pdb_path)
+            #fragments, frag_contact = fragment_sequence(sequence, np.array([]), fixed_length=224, overlap=30)
+            #data_len=len(fragments)
+            rep=0
             
-            if num_xtc==num_pdb==1:
-                sequence = pdb2seq(file_pdb_path)
+            for file_xtc_path in traj_files:
+                #data[pid]={'ind2seq':{}, 'ind2map':{}}
+                #for i in range(data_len):
+                #     data[pid]['ind2map'][i]=[]
+
                 traj = md.load(file_xtc_path, top=file_pdb_path)
                 # cutoff = 7  # in nanometers
-                contact_maps = []
-                for frame in traj:
-                    # compute pairwise distances
-                    distances = md.compute_distances(frame, traj.topology.select_pairs('name CA', 'name CA')) # [1, L] 
-                    # generate contact map: 1 if distance < cutoff, else 0
-                    # contact_map = (distances < cutoff).astype(int)
-                    contact_map = vector_to_contact_map(distances.reshape(-1)) # [N, N]
-                    contact_map = np.expand_dims(contact_map, axis=-1) # [N, N, 1]
-                    normalized_map = normalize_contact_map(contact_map) # [N, N, 1]
-                    three_channel_map = np.repeat(normalized_map, 3, axis=-1) # [N, N, 3]
-                    contact_maps.append(three_channel_map)
-                    if len(contact_maps) == 32:
-                        break  # make contact_maps contain 32 frames # [32, N, N, 3]
+                # contact_maps = []
+                #traj_stride=1000
+                #traj_num=traj.n_frames//traj_stride
+                #traj_remain=traj.n_frames%traj_stride
+                #traj_list=[]
+                #for i in range(traj_num):
+                #    distances = md.compute_distances(traj[i*traj_stride:i*traj_stride+traj_stride], 
+                #    traj[i*traj_stride:i*traj_stride+traj_stride].topology.select_pairs('name CA', 'name CA'))
+                #    contact_maps = vectors_to_contact_maps(distances) # [n, N, N]
+                #    traj_list.append(contact_maps)
+                #
+                #if traj_remain!=0:
+                #    distances = md.compute_distances(traj[-traj_remain:], traj[-traj_remain:].topology.select_pairs('name CA', 'name CA'))
+                #    contact_maps = vectors_to_contact_maps(distances) # [n, N, N]
+                #    traj_list.append(contact_maps)
+                #
+                #contact_maps = np.concatenate(traj_list, axis=0)
                 
-                traj = image_processor(contact_maps, return_tensors="pt", do_rescale=False, offset=False) # [1, 32, 3, 224, 224]
-                input_traj = traj['pixel_values']
-                samples.append((pid, sequence, input_traj))
-    return samples
+                #distances = md.compute_distances(traj, traj.topology.select_pairs('name CA', 'name CA'))
+                #contact_maps = vectors_to_contact_maps(distances) # [n, N, N]
+                #print(contact_maps.dtype)
+                #print(contact_maps.shape)
+                #fragments, frag_contacts = fragment_sequence(sequence, contact_maps, fixed_length=224, overlap=30)
+                fragments, frag_contacts = fragment_sequence(sequence, traj, fixed_length=224, overlap=30)
+                #print(frag_contacts[0].dtype)
+                for i in range(len(fragments)):
+                    frag_seq=fragments[i]
+                    frag_contact=frag_contacts[i]
+                    frag_contact = np.expand_dims(frag_contact, axis=-1) # [n, N, N, 1]
+                    frag_contact = normalize_contact_map(frag_contact) # [n, N, N, 1]
+                    frag_contact = np.repeat(frag_contact, 3, axis=-1) # [n, N, N, 3]
+                    #data[pid]['ind2seq'][i]=frag_seq
+                    #data[pid]['ind2map'][i]=frag_contact
+                #for i in range(len(fragments)):
+                    pid_i = pid+"#frag"+str(i)
+                    h5id = pid_i+"#rep"+str(rep)
+                    #seq_i = data[pid]['ind2seq'][i]
+                    seq_i = frag_seq
+                    # traj = image_processor(data[pid]['ind2map'][i], return_tensors="pt", do_rescale=False, offset=False, 
+                    #                        do_normalize=False, do_resize=True, size=[224, 224]) # [1, 1000, 3, 224, 224]
+                    images = image_processor(list(frag_contact), return_tensors="pt", do_rescale=False, offset=False, 
+                                           do_normalize=False, do_resize=False) # [1, 1000, 3, 224, 224]
+                    images = images['pixel_values']
+                    #print(images.dtype)
+                    groups = group_frames(images)
+                    #print(groups.dtype)
+                    groups = groups.to(device)
+                    sub_num=groups.shape[0]//8
+                    sub_remain=groups.shape[0]%8
+                    rep_list=[]
+                    print(get_memory_usage_gb())
+                    for z in range(sub_num):
+                        #print(z)
+                        sub_groups = groups[z*8:z*8+8]
+                        with torch.no_grad():
+                            vivit_output = model(sub_groups)
+                        last_hidden_states = vivit_output.last_hidden_state #[list_len, 3137, 768]
+                        cls_representation = last_hidden_states[:, 0, :] #[list_len, 1, 768]
+                        # sub_list.append(cls_representation)
+                        rep_list.append(cls_representation.detach().cpu())
+                        #print(get_memory_usage_gb())
+                    
+                    #cls_tem=torch.cat(rep_list, dim=0) #[list_len, 1, 768]
+                    if sub_remain!=0:
+                        sub_groups = groups[-sub_remain:]
+                        with torch.no_grad():
+                            vivit_output = model(sub_groups)
+                        last_hidden_states = vivit_output.last_hidden_state #[list_len, 3137, 768]
+                        cls_representation = last_hidden_states[:, 0, :] #[list_len, 1, 768]
+                        rep_list.append(cls_representation.detach().cpu())
+                        
+                    
+                    #cls_representation = torch.stack(rep_list, axis=0) #[list_len,  768]
+                    cls_representation = torch.cat(rep_list, dim=0) #[list_len, 768]
+                    #print(cls_representation.shape)
+                    pooled = cls_representation.mean(axis=0)  # shape: (768,)
+                    #print(pooled.shape)
+                    # samples.append((h5id, pid_i, seq_i, pooled))
+                    saveh5((pid_i, seq_i, pooled), os.path.join(output_folder, h5id+".h5"))
+                    del rep_list, images, groups, frag_contact
+                    torch.cuda.empty_cache()
+                    print(get_memory_usage_gb())
+                rep+=1
+                del traj
+                torch.cuda.empty_cache()
+                print(get_memory_usage_gb())
+    
+
+def fragment_sequence(sequence, traj, fixed_length, overlap):
+    fragments = []
+    frag_contact = []
+    stride = fixed_length - overlap
+    start = 0
+    seq_len = len(sequence)
+    while start < seq_len:
+        end = min(start + fixed_length, seq_len)
+        fragment = sequence[start:end]
+        fragments.append(fragment)  # Add fragment *before* checking length
+        atom_indices = traj.topology.select(f"resid {start} to {end-1}")
+        sub_traj = traj.atom_slice(atom_indices)
+        distances = md.compute_distances(sub_traj, sub_traj.topology.select_pairs('name CA', 'name CA'))
+        contact_map = vectors_to_contact_maps(distances) # [n, N, N]
+        print(start, end)
+        print(contact_map.shape)
+        if contact_map.size!=0:
+            if end-start<fixed_length:
+                background = np.zeros((contact_map.shape[0], 224, 224), dtype=contact_map.dtype)
+                #background[:, :end-start, :end-start] = contact_map[:, start:end, start:end]
+                background[:, :end-start, :end-start] = contact_map
+                frag_contact.append(background)
+            else:
+                #frag_contact.append(contact_map[:, start:end, start:end])
+                frag_contact.append(contact_map)
+        if end == seq_len: #check if the end of the sequence has been reached
+            break
+        start += stride
+    return fragments, frag_contact
 
 
+def saveh5(sample, h5file):
+    (pid, seq, pooled) = sample
+    # outname = h5file + str()
+    os.makedirs(os.path.dirname(h5file), exist_ok=True)
+    with h5py.File(h5file, 'w') as f:
+    
+        # Convert torch tensor to numpy
+        grp = f.create_group(pid)
+        # grp.attrs['pid'] = pid.encode('utf-8')
+        # grp = f.create_group(str(pid))
+        grp.create_dataset('pooled', data=pooled, compression='gzip')
+        # Save sequence as attribute or dataset (if string, encode first)
+        grp.attrs['seq'] = str(seq).encode('utf-8')
+
+def loadh5(h5file):
+    with h5py.File(h5file, 'r') as f:
+        name = os.path.basename(h5file)
+        pid = "#".join(name.split('#')[:2])
+        # pid=f[pid].attrs['pid']
+        # pid = 'some_pid'
+        pooled = f[pid]['pooled'][:]
+        seq = f[pid].attrs['seq']
+    return pid, pooled, seq
 
 
+def group_frames(traj, group_size=32): # traj => [1, 1001, 3, 224, 224]
+    """
+    Group frames into sets of specified size.
+    
+    Args:
+        total_frames (int): Total number of frames
+        group_size (int): Number of frames in each group
+        
+    Returns:
+        list: List of lists, where each inner list is a group of frames
+    """
+    total_frames = traj.shape[1]
+    groups = []
+    
+    # Calculate how many complete groups we'll have
+    num_complete_groups = total_frames // group_size
+    
+    # Group the frames
+    for i in range(num_complete_groups):
+        start_idx = i * group_size
+        end_idx = start_idx + group_size
+        group = traj[:,start_idx:end_idx,:,:,:]
+        groups.append(group)
+    
+    # Handle any remaining frames
+    remaining_frames = total_frames % group_size
+    if remaining_frames > 0:
+        group = traj[:,total_frames-32:,:,:,:]
+        groups.append(group)
+    
+    processed_arrays = [arr.squeeze(0) for arr in groups]  # shape becomes [32, 3, 224, 224]
+    # Stack along a new axis (axis=0)
+    result = torch.stack(processed_arrays, axis=0) # [list_len, 32, 3, 224, 224]
+    return result
+
+def split_subfolders_into_n_lists(folder_path, n=6):
+    # 获取folder_path下所有一级子文件夹（完整路径）
+    all_subfolders = [os.path.join(folder_path, d) for d in os.listdir(folder_path)
+                      if os.path.isdir(os.path.join(folder_path, d))]
+    # 按字母排序（可选）
+    all_subfolders.sort()
+    # 创建n个空列表
+    lists = [[] for _ in range(n)]
+    # 均匀分配
+    for i, subfolder in enumerate(all_subfolders):
+        lists[i % n].append(os.path.abspath(subfolder))
+    
+    return lists
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='PyTorch SimCLR')
+    parser.add_argument("--data_folder2search", help="xx", default='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/')
+    parser.add_argument("--model_name", default='google/vivit-b-16x2-kinetics400', help='xx')
+    parser.add_argument("--list_num", type=int, default=0, help="xx")
+    parser.add_argument("--output_folder", default='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_Atlas_data', help="xx")
+    parser.add_argument("--split_num", type=int, default=6, help="xx")
+
+    
+    args_main = parser.parse_args()
+    lists = split_subfolders_into_n_lists(args_main.data_folder2search, n=args_main.split_num)
+    process_samples(args_main.data_folder2search, args_main.model_name,
+                     sub_list=lists[args_main.list_num], output_folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_Atlas_data')
