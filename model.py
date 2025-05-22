@@ -269,15 +269,15 @@ class VIVIT(nn.Module):  # embedding table is fixed
         """
         super(VIVIT, self).__init__()
         # self.image_processor = VivitImageProcessor.from_pretrained(vivit_pretrain)
-        self.model = VivitModel.from_pretrained(vivit_pretrain, cache_dir=configs.HF_cache_path)
+        # self.model = VivitModel.from_pretrained(vivit_pretrain, cache_dir=configs.HF_cache_path)
 
-        dim_mlp = self.model.config.hidden_size
+        dim_mlp = 768
         
         self.projectors_protein = MoBYMLP(in_dim=dim_mlp, inner_dim=protein_inner_dim, out_dim=protein_out_dim,
                                           num_layers=protein_num_projector)
 
-        self.projectors_residue = MoBYMLP(in_dim=dim_mlp, inner_dim=residue_inner_dim, out_dim=residue_out_dim,
-                                          num_layers=residue_num_projector)
+        # self.projectors_residue = MoBYMLP(in_dim=dim_mlp, inner_dim=residue_inner_dim, out_dim=residue_out_dim,
+        #                                   num_layers=residue_num_projector)
         
 
         if hasattr(configs.model.MD_encoder, "fine_tuning") and not configs.model.MD_encoder.fine_tuning.enable:
@@ -288,23 +288,23 @@ class VIVIT(nn.Module):  # embedding table is fixed
             for name, param in self.projectors_protein.named_parameters():
                 param.requires_grad = False
             
-            for name, param in self.projectors_residue.named_parameters():
-                param.requires_grad = False
+            # for name, param in self.projectors_residue.named_parameters():
+            #     param.requires_grad = False
 
-    def forward(self, x, return_logits=False, return_embedding=False):
-        outputs = self.model(x)
+    def forward(self, x, return_logits=False, return_embedding=False): # x shape [batch, 768]
+        #outputs = self.model(x)
         # print("OKOKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK")
         if return_logits:
             # prediction_scores = outputs["logits"]
             # return prediction_scores
             print("print something")
         else:
-            last_hidden_states = outputs.last_hidden_state # [batch, 3137, 768]
-            cls_representation = last_hidden_states[:, 0, :] # [batch, 768]
-            graph_feature = self.projectors_protein(cls_representation)
+            # last_hidden_states = outputs.last_hidden_state # [batch, 3137, 768]
+            # cls_representation = last_hidden_states[:, 0, :] # [batch, 768]
+            graph_feature = self.projectors_protein(x)
 
         if return_embedding:
-            return graph_feature, cls_representation
+            return graph_feature, x
         else:
             return graph_feature
 
