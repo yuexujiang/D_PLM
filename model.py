@@ -407,10 +407,6 @@ class ESM2(nn.Module):  # embedding table is fixed
                 for p in self.esm2.emb_layer_norm_after.parameters():
                     p.requires_grad = True
 
-        self.pool_mode = configs.model.esm_encoder.pool_mode
-        # if self.pool_mode == 3:
-        #     self.pe = get_embedding(self.esm2.embed_dim, configs.model.esm_encoder.max_length + 2).to(
-        #         configs.train_settings.device)
 
         self.projectors_residue = MoBYMLP(in_dim=self.esm2.embed_dim,
                                           inner_dim=residue_inner_dim,

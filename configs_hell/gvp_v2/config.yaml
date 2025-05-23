@@ -10,7 +10,6 @@ resume:
   restart_optimizer: True
 
 model:
-  compile_model: False
   residue_out_dim: 64
   protein_out_dim: 256
   residue_num_projector: 1
@@ -45,7 +44,6 @@ model:
       resume:
         enable: False
         checkpoint_path: path/to/checkpoints.pth
-    pool_mode: 2 #average pooling without padding
   struct_encoder:
     version: v2 #v1 or v2
     residue_inner_dim: 1024
@@ -78,7 +76,13 @@ model:
 
 train_settings:
   MD_data_path: ./data/MD/dev_data/
-  data_path: /cluster/pixstor/xudong-lab/duolin/swiss-pos-512-v2_splitdata/train/
+  #data_path: /cluster/pixstor/xudong-lab/duolin/swiss-pos-512-v2_splitdata/train/
+  Atlas_data_repli_0_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_data_rep0
+  Atlas_data_repli_1_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_data_rep1
+  Atlas_data_repli_2_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_data_rep2
+  Atlas_test_repli_0_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_test_rep0
+  Atlas_test_repli_1_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_test_rep1
+  Atlas_test_repli_2_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_test_rep2
   num_steps: 100 #10000000
   shuffle: True
   mixed_precision: "fp16" # no, fp16, bf16, fp8

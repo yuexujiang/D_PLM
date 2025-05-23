@@ -18,37 +18,35 @@ class ProteinMDDataset(Dataset):
     def __len__(self):
            return len(self.original_samples)
     def __getitem__(self, idx):
-        pid, seq, traj = self.original_samples[idx]
-        return pid, seq, traj
+        pid, seq, rep = self.original_samples[idx]
+        return pid, seq, rep
 
 
 def custom_collate(batch):
-    pid, seq, trajs = zip(*batch)
+    pid, seq, rep = zip(*batch)
     # Remove the extra dimension from each contact sample
-    traj_list = [traj.squeeze(0) for traj in trajs]
+    # traj_list = [traj.squeeze(0) for traj in reps]
     # Now each traj has shape [32, 3, 224, 224]
     # Stack them along a new first dimension (batch dimension)
-    traj_batch = torch.stack(traj_list, dim=0)
-    batched_data = {'pid': pid, 'seq': seq, 'traj': traj_batch}
+    # traj_batch = torch.stack(traj_list, dim=0)
+    batched_data = {'pid': pid, 'seq': seq, 'traj': rep}
     # return pid, seq, contacts
     return batched_data
 
-def prepare_dataloaders(configs):
-    samples = prepare_samples(configs.train_settings.Atlas_data_path, 
-                              configs.model.MD_encoder.model_name, 
-                              configs.HF_cache_path)
+def prepare_replicate(configs, train_repli_path, test_repli_path):
+    samples = prepare_samples(train_repli_path)
     total_samples = len(samples)
     val_size = int(total_samples * 0.1)
     test_size = int(total_samples * 0.1)
     train_size = total_samples - val_size - test_size
     train_samples, val_samples, test_samples = random_split(samples, [train_size, val_size, test_size])
-    samples_hard = prepare_samples(configs.train_settings.Atlas_test_path, 
-                              configs.model.MD_encoder.model_name, 
-                              configs.HF_cache_path)
+
+    samples_hard = prepare_samples(test_repli_path)
     hard_num = len(samples_hard)
     val_size = int(hard_num * 0.5)
     test_size = hard_num - val_size
     val_hard, test_hard = random_split(samples_hard, [val_size, test_size])
+
     val_samples = val_samples + val_hard
     test_samples = test_samples + test_hard
     print(f"train samples: {len(train_samples)}, val samples: {len(val_samples)}, test samples: {len(test_samples)}")
@@ -81,6 +79,19 @@ def prepare_dataloaders(configs):
     # dataloader = DataLoader(dataset, batch_size=configs.train_settings.batch_size, shuffle=True, collate_fn=custom_collate,drop_last=False)
     return train_dataloader, val_dataloader, test_dataloader
 
+def prepare_dataloaders(configs):
+    train_dataloader_repli_0, val_dataloader_repli_0, test_dataloader_repli_0 = prepare_replicate(configs, 
+                                                                          configs.train_settings.Atlas_data_repli_0_path, 
+                                                                          configs.train_settings.Atlas_test_repli_0_path)
+    train_dataloader_repli_1, val_dataloader_repli_1, test_dataloader_repli_1 = prepare_replicate(configs, 
+                                                                          configs.train_settings.Atlas_data_repli_1_path, 
+                                                                          configs.train_settings.Atlas_test_repli_1_path)
+    train_dataloader_repli_2, val_dataloader_repli_2, test_dataloader_repli_2 = prepare_replicate(configs, 
+                                                                          configs.train_settings.Atlas_data_repli_2_path, 
+                                                                          configs.train_settings.Atlas_test_repli_2_path)
+    return ((train_dataloader_repli_0, val_dataloader_repli_0, test_dataloader_repli_0),
+            (train_dataloader_repli_1, val_dataloader_repli_1, test_dataloader_repli_1),
+            (train_dataloader_repli_2, val_dataloader_repli_2, test_dataloader_repli_2))
 
 
 def vectors_to_contact_maps(vecs):
@@ -141,8 +152,15 @@ def normalize_contact_map(contact_map):
     normalized_map = np.clip(normalized_map, 0, 1)
     return normalized_map
 
-def prepare_samples():
-    return 0
+def prepare_samples(datapath):
+    samples=[]
+    for file_name in os.listdir(datapath):
+        file_path = os.path.abspath(os.path.join(datapath, file_name))
+        pid, seq, rep = loadh5(file_path)
+        samples.append((pid, seq, rep))
+    
+    return samples
+
 
 def process_samples(data_folder2search, model_name, sub_list, output_folder):
     image_processor = VivitImageProcessor.from_pretrained(model_name)
@@ -323,9 +341,9 @@ def loadh5(h5file):
         pid = "#".join(name.split('#')[:2])
         # pid=f[pid].attrs['pid']
         # pid = 'some_pid'
-        pooled = f[pid]['pooled'][:]
+        rep = f[pid]['pooled'][:]
         seq = f[pid].attrs['seq']
-    return pid, pooled, seq
+    return pid, seq, rep
 
 
 def group_frames(traj, group_size=32): # traj => [1, 1001, 3, 224, 224]

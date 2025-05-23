@@ -266,7 +266,7 @@ def prepare_loss_MD(simclr,traj,batch_tokens,criterion, loss,
     # return loss, simclr_loss,simclr_residue_loss,MLM_loss, logits, labels, logits_residue, labels_residue
     return loss, simclr_loss, MLM_loss, logits, labels
 
-def training_loop_MD(simclr, start_step,train_loader, val_loader, batch_converter, criterion,
+def training_loop_MD(simclr, start_step, train_loader, val_loader, test_loader, batch_converter, criterion,
                   optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, train_writer, valid_writer,
                   result_path, logging, configs, masked_lm_data_collator=None, **kwargs):
     torch.cuda.empty_cache()
@@ -316,20 +316,6 @@ def training_loop_MD(simclr, start_step,train_loader, val_loader, batch_converte
                         masked_lm_data_collator
                         )
                     
-                """
-                if (train_alt and n_sub_steps % 2 == 0) or not train_alt:
-                    features_struct, residue_struct, features_seq, residue_seq = simclr(
-                        graph=graph, batch_tokens=batch_tokens)
-
-                    residue_struct, residue_seq, plddt_residue = residue_batch_sample(
-                        residue_struct, residue_seq, batch['plddt'],
-                        configs.train_settings.residue_batch_size, accelerator)
-
-                    loss, simclr_loss, simclr_residue_loss, logits, labels, logits_residue, labels_residue = prepare_loss(
-                        features_struct, features_seq, residue_struct, residue_seq, plddt_residue, criterion,
-                        loss, accelerator, configs,
-                        )
-                    """
 
                 # Gather the losses across all processes for logging (if we use distributed training).
                 avg_loss = accelerator.gather(loss.repeat(configs.train_settings.batch_size)).mean()
@@ -373,17 +359,17 @@ def training_loop_MD(simclr, start_step,train_loader, val_loader, batch_converte
                                      result_path, accelerator.unwrap_model(simclr), n_steps, logging, epoch_num)
 
                 # todo: add tensorboard here
-                # if n_steps % configs.valid_settings.do_every == 0 and n_steps != 0:  # I want to see the step evaluations
-                #     print("in evaluation loop")
-                #     # Protein level
-                #     accelerator.wait_for_everyone()
-                #     evaluation_loop(simclr, val_loader, labels, labels_residue, batch_converter, criterion, configs,
-                #                     simclr_loss=simclr_loss, simclr_residue_loss=simclr_residue_loss, MLM_loss = MLM_loss,losses=losses,
-                #                     n_steps=n_steps, scheduler_seq=scheduler_seq, result_path=result_path,
-                #                     scheduler_struct=scheduler_x, logits=logits, logits_residue=logits_residue,
-                #                     loss=loss, bsz=bsz, train_writer=train_writer,valid_writer=valid_writer,
-                #                     masked_lm_data_collator=masked_lm_data_collator, logging=logging,
-                #                     accelerator=accelerator)
+                if n_steps % configs.valid_settings.do_every == 0 and n_steps != 0:  # I want to see the step evaluations
+                    print("in evaluation loop")
+                    # Protein level
+                    accelerator.wait_for_everyone()
+                    evaluation_loop_MD(simclr, val_loader, labels, batch_converter, criterion, configs,
+                                    simclr_loss=simclr_loss, MLM_loss = MLM_loss,losses=losses,
+                                    n_steps=n_steps, scheduler_seq=scheduler_seq, result_path=result_path,
+                                    scheduler_x=scheduler_x, logits=logits, 
+                                    loss=loss, bsz=bsz, train_writer=train_writer,valid_writer=valid_writer,
+                                    masked_lm_data_collator=masked_lm_data_collator, logging=logging,
+                                    accelerator=accelerator)
 
                 # if configs.valid_settings.eval_struct.enable and (
                 #         n_steps % configs.valid_settings.eval_struct.do_every == 0) and n_steps != 0:  # or n_steps == 1):
@@ -406,6 +392,130 @@ def training_loop_MD(simclr, start_step,train_loader, val_loader, batch_converte
 
         if accelerator.is_main_process:
             logging.info(f"one epoch cost {(end - start):.2f}, number of trained steps {n_steps}")
+
+def evaluation_loop_MD(simclr, val_loader, labels, batch_converter, criterion, configs, logging, **kwargs):
+    accelerator = kwargs['accelerator']
+
+    n_steps = kwargs['n_steps']
+    result_path = kwargs['result_path']
+    train_writer = kwargs['train_writer']
+    valid_writer = kwargs['valid_writer']
+
+    losses = kwargs['losses']
+    loss = kwargs['loss']
+    MLM_loss = kwargs['MLM_loss']
+    simclr_loss = kwargs['simclr_loss']
+    masked_lm_data_collator = kwargs['masked_lm_data_collator']
+    logits = kwargs['logits']
+
+    bsz = kwargs['bsz']
+    scheduler_struct = kwargs['scheduler_x']
+    scheduler_seq = kwargs['scheduler_seq']
+
+    l_prob = logits[:, 0].mean()
+    negsim_struct_struct = log_negative_mean_logtis(logits, "struct_struct", bsz)
+    negsim_struct_seq = log_negative_mean_logtis(logits, "struct_seq", bsz)
+    negsim_seq_seq = log_negative_mean_logtis(logits, "seq_seq", bsz)
+    top1, top5 = accuracy(logits, labels, topk=(1, 1))
+
+    if accelerator.is_main_process:
+        logging.info(f'evaluation - step {n_steps}')
+        logging.info(
+            f"step:{n_steps} Loss:{loss:.4f},graph_loss:{simclr_loss:.4f},Top1 accuracy:{top1[0]},P:{l_prob.item():.2f},"
+            f"N_st_st:{negsim_struct_struct:.2f},N_st_s:{negsim_struct_seq:.2f},N_s_s:{negsim_seq_seq:.2f}")
+        
+        if hasattr(configs.model.esm_encoder,"MLM") and configs.model.esm_encoder.MLM.enable:
+               logging.info(f"step:{n_steps} MLM_loss: {MLM_loss:.4f}")
+               train_writer.add_scalar('mlm_loss', MLM_loss, n_steps)
+        
+        train_writer.add_scalar('loss', loss, n_steps)
+        train_writer.add_scalar('graph_loss', simclr_loss, n_steps)
+        train_writer.add_scalar('top_1_accuracy', top1[0], n_steps)
+        train_writer.add_scalar('p', l_prob.item(), n_steps)
+        train_writer.add_scalar('n_st_st', negsim_struct_struct, n_steps)
+        train_writer.add_scalar('n_st_s', negsim_struct_seq, n_steps)
+        train_writer.add_scalar('n_s_s', negsim_seq_seq, n_steps)
+
+
+    loss_val_sum = 0
+    graph_loss_sum = 0
+    MLM_loss_sum = 0
+    l_prob, l_prob_residue = 0, 0
+    negsim_struct_seq, negsim_struct_seq_residue = 0, 0
+    negsim_seq_seq, negsim_seq_seq_residue = 0, 0
+    negsim_struct_struct, negsim_struct_struct_residue = 0, 0
+
+    k = 0
+    progress_bar = tqdm(range(0, len(val_loader)), disable=True, leave=True, desc=f"Evaluation steps")
+    for batch in val_loader:
+        batch_seq = [(batch['pid'][i], str(batch['seq'][i])) for i in range(len(batch['seq']))]  # batch['seq']
+        bsz = len(batch)
+        batch_labels, batch_strs, batch_tokens = batch_converter(batch_seq)
+        trajs = batch["traj"]
+        batch_tokens = batch_tokens.to(accelerator.device)
+        trajs = trajs.to(accelerator.device)
+
+        simclr.eval()
+        with torch.inference_mode():
+            """
+            features_struct, residue_struct, features_seq, residue_seq = simclr(graph=graph, batch_tokens=batch_tokens)
+
+            residue_struct, residue_seq, plddt_residue = residue_batch_sample(
+                residue_struct, residue_seq, batch['plddt'],
+                configs.train_settings.residue_batch_size, accelerator)
+
+            # Prepare loss
+            loss_val_sum, graph_loss, residue_loss, logits, labels, logits_residue, labels_residue = prepare_loss(
+                features_struct, features_seq, residue_struct, residue_seq, plddt_residue, criterion, (torch.tensor(0).float()).to(accelerator.device),
+                accelerator, configs)
+            """
+            loss_val_sum, graph_loss, MLM_loss,logits, labels= prepare_loss_MD(
+                simclr,trajs,batch_tokens,criterion,loss_val_sum,accelerator, configs,
+                masked_lm_data_collator
+                )
+            graph_loss_sum += graph_loss
+            MLM_loss_sum += MLM_loss
+            l_prob += logits[:, 0].mean().item()
+            negsim_struct_struct += log_negative_mean_logtis(logits, "struct_struct", bsz)
+            negsim_struct_seq += log_negative_mean_logtis(logits, "struct_seq", bsz)
+            negsim_seq_seq += log_negative_mean_logtis(logits, "seq_seq", bsz)
+
+            k = k + 1
+
+        progress_bar.update(1)
+
+    loss_val_sum = loss_val_sum / float(k)
+    graph_loss_sum = graph_loss_sum / float(k)
+    l_prob = l_prob / float(k)
+    negsim_struct_struct = negsim_struct_struct / float(k)
+    negsim_struct_seq = negsim_struct_seq / float(k)
+    negsim_seq_seq = negsim_seq_seq / float(k)
+
+    (loss_val, val_graph_loss,  val_l_prob, val_negsim_struct_struct, val_negsim_struct_seq,
+     val_negsim_seq_seq) = (float(loss_val_sum), float(graph_loss_sum),  float(l_prob),
+                                    float(negsim_struct_struct), float(negsim_struct_seq), 
+                                    float(negsim_seq_seq))
+    
+    MLM_loss_sum = float(MLM_loss_sum)/float(k)
+    if accelerator.is_main_process:
+        logging.info(
+            f"step:{n_steps} Val_loss:{loss_val:.4f},val_graph_loss:{val_graph_loss:.4f},val_P:{val_l_prob:.2f},"
+            f"val_N_st_st:{val_negsim_struct_struct:.2f},val_N_st_s:{val_negsim_struct_seq:.2f},"
+            f"val_N_s_s:{val_negsim_seq_seq:.2f}")
+        
+        if hasattr(configs.model.esm_encoder,"MLM") and configs.model.esm_encoder.MLM.enable:
+               logging.info(f"step:{n_steps} val_MLM_loss: {MLM_loss_sum:.4f}")
+               valid_writer.add_scalar('mlm_loss', MLM_loss_sum, n_steps)
+        
+        valid_writer.add_scalar('loss', loss_val, n_steps)
+        valid_writer.add_scalar('graph_loss', val_graph_loss, n_steps)
+        valid_writer.add_scalar('p', val_l_prob, n_steps)
+        valid_writer.add_scalar('n_st_st', val_negsim_struct_struct, n_steps)
+        valid_writer.add_scalar('n_st_s', val_negsim_struct_seq, n_steps)
+        valid_writer.add_scalar('n_s_s', val_negsim_seq_seq, n_steps)
+
+    # if accelerator.is_main_process:
+    #    seq_evaluation_loop(simclr, n_steps, configs, batch_converter, result_path, valid_writer, logging, accelerator)
 
 def evaluation_loop(simclr, val_loader, labels, labels_residue, batch_converter, criterion, configs, logging, **kwargs):
     accelerator = kwargs['accelerator']
@@ -735,8 +845,10 @@ def main(args, dict_configs, config_file_path):
 
     if configs.model.X_module == 'MD':
         from data.data_MD import prepare_dataloaders as prepare_dataloaders_v2
-        train_loader = prepare_dataloaders_v2(configs)
-        val_loader = prepare_dataloaders_v2(configs)
+        ((train_dataloader_repli_0, val_dataloader_repli_0, test_dataloader_repli_0),
+         (train_dataloader_repli_1, val_dataloader_repli_1, test_dataloader_repli_1),
+         (train_dataloader_repli_2, val_dataloader_repli_2, test_dataloader_repli_2)) = prepare_dataloaders_v2(configs)
+        # val_loader = prepare_dataloaders_v2(configs)
     else:
         if hasattr(configs.model.struct_encoder,"version") and configs.model.struct_encoder.version == 'v2':
             from data.data_v2 import prepare_dataloaders as prepare_dataloaders_v2
@@ -755,11 +867,6 @@ def main(args, dict_configs, config_file_path):
 
     train_loader, val_loader = accelerator.prepare(train_loader, val_loader)
 
-    if configs.model.compile_model:
-        simclr = torch.compile(simclr)
-        if accelerator.is_main_process:
-            logging.info('compile model is done')
-
     criterion = torch.nn.CrossEntropyLoss(reduction='none')
 
     if accelerator.is_main_process:
@@ -777,7 +884,7 @@ def main(args, dict_configs, config_file_path):
             result_path, logging, configs, masked_lm_data_collator=masked_lm_data_collator, accelerator=accelerator
         )
     elif configs.model.X_module == 'MD':
-        training_loop_MD(simclr, start_step,train_loader, val_loader, batch_converter, criterion,
+        training_loop_MD(simclr, start_step, train_loader, val_loader, batch_converter, criterion,
                   optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, train_writer, valid_writer,
                   result_path, logging, configs, masked_lm_data_collator=masked_lm_data_collator, accelerator=accelerator)
 
