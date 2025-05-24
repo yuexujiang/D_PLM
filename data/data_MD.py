@@ -407,4 +407,4 @@ if __name__ == "__main__":
     args_main = parser.parse_args()
     lists = split_subfolders_into_n_lists(args_main.data_folder2search, n=args_main.split_num)
     process_samples(args_main.data_folder2search, args_main.model_name,
-                     sub_list=lists[args_main.list_num], output_folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_Atlas_data')
+                     sub_list=lists[args_main.list_num], output_folder=args_main.output_folder)

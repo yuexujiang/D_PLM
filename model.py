@@ -280,9 +280,9 @@ class VIVIT(nn.Module):  # embedding table is fixed
         #                                   num_layers=residue_num_projector)
         
 
-        if hasattr(configs.model.MD_encoder, "fine_tuning") and not configs.model.MD_encoder.fine_tuning.enable:
-            for name, param in self.model.named_parameters():
-                param.requires_grad = False
+        # if hasattr(configs.model.MD_encoder, "fine_tuning") and not configs.model.MD_encoder.fine_tuning.enable:
+        #     for name, param in self.model.named_parameters():
+        #         param.requires_grad = False
 
         if hasattr(configs.model.MD_encoder, "fine_tuning_projct") and not configs.model.MD_encoder.fine_tuning_projct.enable:
             for name, param in self.projectors_protein.named_parameters():

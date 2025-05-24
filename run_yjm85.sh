@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --mem 30G
+#SBATCH --mem 64G
 #SBATCH -n 1
 #SBATCH --gres gpu:A100:1
-#SBATCH --time 05:00:00 #Time for the job to run
+#SBATCH --time 01-00:00:00 #Time for the job to run
 #SBATCH --job-name long
-#SBATCH -p gpu
-##SBATCH -p xudong-gpu
+##SBATCH -p gpu
+#SBATCH -p xudong-gpu
 #SBATCH -A xudong-lab
 
 
@@ -20,5 +20,6 @@ export HF_HOME=/cluster/pixstor/xudong-lab/yuexu/transformers_cache/
 
 
 
-accelerate launch train.py --config_path ./configs_hell/gvp_v2/config_plddtallweight_noseq_v2.yaml \
---result_path ./results/plddtallweight_noseq_v2/
+# accelerate launch train.py --config_path ./configs_hell/gvp_v2/config_plddtallweight_noseq_v2.yaml \
+# --result_path ./results/plddtallweight_noseq_v2/
+accelerate launch train.py --config_path $config_path --result_path $result_path

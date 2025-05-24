@@ -308,7 +308,8 @@ def training_loop_MD(simclr, start_step, train_loader, val_loader, test_loader, 
                 trajs = batch["traj"]
                 batch_tokens = batch_tokens.to(accelerator.device)
                 # graph = graph.to(accelerator.device)
-                trajs = trajs.to(accelerator.device)
+                # trajs = trajs.to(accelerator.device)
+                trajs = torch.tensor(np.array(trajs)).to(accelerator.device)
                 loss = torch.tensor(0).float()
                 loss = loss.to(accelerator.device)
                 loss, simclr_loss, MLM_loss,logits, labels= prepare_loss_MD(
@@ -453,7 +454,8 @@ def evaluation_loop_MD(simclr, val_loader, labels, batch_converter, criterion, c
         batch_labels, batch_strs, batch_tokens = batch_converter(batch_seq)
         trajs = batch["traj"]
         batch_tokens = batch_tokens.to(accelerator.device)
-        trajs = trajs.to(accelerator.device)
+        # trajs = trajs.to(accelerator.device)
+        trajs = torch.tensor(np.array(trajs)).to(accelerator.device)
 
         simclr.eval()
         with torch.inference_mode():
@@ -865,7 +867,12 @@ def main(args, dict_configs, config_file_path):
         simclr, scheduler_seq, scheduler_x, optimizer_seq, optimizer_x
         )
 
-    train_loader, val_loader = accelerator.prepare(train_loader, val_loader)
+    # train_loader, val_loader = accelerator.prepare(train_loader, val_loader)
+    ((train_dataloader_repli_0, val_dataloader_repli_0, test_dataloader_repli_0),
+     (train_dataloader_repli_1, val_dataloader_repli_1, test_dataloader_repli_1),
+     (train_dataloader_repli_2, val_dataloader_repli_2, test_dataloader_repli_2))=accelerator.prepare(((train_dataloader_repli_0, val_dataloader_repli_0, test_dataloader_repli_0),
+                                                                                                       (train_dataloader_repli_1, val_dataloader_repli_1, test_dataloader_repli_1),
+                                                                                                       (train_dataloader_repli_2, val_dataloader_repli_2, test_dataloader_repli_2)))
 
     criterion = torch.nn.CrossEntropyLoss(reduction='none')
 
@@ -873,7 +880,11 @@ def main(args, dict_configs, config_file_path):
         logging.info(f"Start contrastive training for {configs.train_settings.num_steps} steps.")
 
     if accelerator.is_main_process:
-        train_steps = np.ceil(len(train_loader) / configs.train_settings.gradient_accumulation)
+        if configs.model.X_module == 'structure':
+            train_steps = np.ceil(len(train_loader) / configs.train_settings.gradient_accumulation)
+        elif configs.model.X_module == 'MD':
+            train_steps = np.ceil(len(train_dataloader_repli_0) / configs.train_settings.gradient_accumulation)
+            train_steps = train_steps * 3
         logging.info(f'Number of train steps per epoch: {int(train_steps)}')
         logging.info(f"Training with: {accelerator.device} and fix_seed = {configs.fix_seed}")
     
@@ -884,7 +895,13 @@ def main(args, dict_configs, config_file_path):
             result_path, logging, configs, masked_lm_data_collator=masked_lm_data_collator, accelerator=accelerator
         )
     elif configs.model.X_module == 'MD':
-        training_loop_MD(simclr, start_step, train_loader, val_loader, batch_converter, criterion,
+        training_loop_MD(simclr, start_step, train_dataloader_repli_0, val_dataloader_repli_0, test_dataloader_repli_0, batch_converter, criterion,
+                  optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, train_writer, valid_writer,
+                  result_path, logging, configs, masked_lm_data_collator=masked_lm_data_collator, accelerator=accelerator)
+        training_loop_MD(simclr, start_step, train_dataloader_repli_1, val_dataloader_repli_1, test_dataloader_repli_1, batch_converter, criterion,
+                  optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, train_writer, valid_writer,
+                  result_path, logging, configs, masked_lm_data_collator=masked_lm_data_collator, accelerator=accelerator)
+        training_loop_MD(simclr, start_step, train_dataloader_repli_2, val_dataloader_repli_2, test_dataloader_repli_2, batch_converter, criterion,
                   optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, train_writer, valid_writer,
                   result_path, logging, configs, masked_lm_data_collator=masked_lm_data_collator, accelerator=accelerator)
 
