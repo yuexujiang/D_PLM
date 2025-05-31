@@ -21,6 +21,8 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import adjusted_rand_score
 import math
 from collections import OrderedDict
+from inspect import signature
+from sklearn.metrics import silhouette_score
 
 
 def get_embedding(embed_dim, num_embeddings):
@@ -270,6 +272,298 @@ def init_model(esmType, checkpoint_path=None,
 
     return model_prepresent, batch_converter
 
+def evaluate_with_cath_more_md(out_figure_path, steps, accelerator, batch_size, model, batch_converter, cathpath):
+    Path(out_figure_path).mkdir(parents=True, exist_ok=True)
+    seq_embeddings = []
+    input = open(cathpath)
+    labels = []
+    seqs = []
+    for line in input:
+        labels.append(line[1:].split("|")[0].strip())
+        line = next(input)
+        seqs.append(line.strip())
+    
+    from torch.utils.data import DataLoader, Dataset
+    
+    class DataSet(Dataset):
+        def __init__(self, pad_seq):
+            self.pad_seq = pad_seq
+        
+        def __len__(self):
+            return len(self.pad_seq)
+        
+        def __getitem__(self, index):
+            return index, self.pad_seq[index]
+    
+    dataset_val = DataSet(seqs)
+    val_loader = DataLoader(dataset_val, batch_size=batch_size, num_workers=0, pin_memory=False, drop_last=False)
+    # val_loader = accelerator.prepare(val_loader)
+    
+    # model_prepresent.eval()
+    for batch in val_loader:
+        batch_seq = [(batch[0][i].item(), str(batch[1][i])) for i in range(len(batch[0]))]
+        with torch.inference_mode():
+            batch_labels, batch_strs, batch_tokens = batch_converter(batch_seq)
+            batch_tokens = batch_tokens.to(accelerator.device)
+            model_signature = signature(model.forward)
+            if 'batch_tokens' in model_signature.parameters:
+                _, _, features_seq, _  = model(batch_tokens=batch_tokens, mode='sequence', return_embedding=True)
+            else:
+                _, _, features_seq, _  = model(batch_tokens, mode='sequence', return_embedding=True)
+            
+            seq_embeddings.extend(features_seq.cpu().detach().numpy())
+    
+    seq_embeddings = np.asarray(seq_embeddings)
+    mdel = TSNE(n_components=2, random_state=0, init='random',method='exact')
+    # print("Projecting to 2D by TSNE\n")
+    z_tsne_seq = mdel.fit_transform(seq_embeddings)
+    scores = []
+    tol_archi_seq = {"3.30", "3.40", "1.10", "3.10", "2.60"}
+    tol_fold_seq = {"1.10.10", "3.30.70", "2.60.40", "2.60.120", "3.40.50"}
+    
+    for digit_num in [1, 2, 3]:  # first number of digits
+        color = []
+        colorid = []
+        keys = {}
+        colorindex = 0
+        if digit_num == 1:
+            ct = ["blue", "red", "black", "yellow", "orange", "green", "olive", "gray", "magenta", "hotpink", "pink",
+                  "cyan", "peru", "darkgray", "slategray", "gold"]
+        else:
+            ct = ["black", "yellow", "orange", "green", "olive", "gray", "magenta", "hotpink", "pink", "cyan", "peru",
+                  "darkgray", "slategray", "gold"]
+        
+        select_label = []
+        select_index = []
+        color_dict = {}
+        for label in labels:
+            key = ".".join([x for x in label.split(".")[0:digit_num]])
+            if digit_num == 2:
+                if key not in tol_archi_seq:
+                    continue
+            if digit_num == 3:
+                if key not in tol_fold_seq:
+                    continue
+            
+            if key not in keys:
+                keys[key] = colorindex
+                colorindex += 1
+            
+            select_label.append(keys[key])
+            color.append(ct[(keys[key]) % len(ct)])
+            colorid.append(keys[key])
+            select_index.append(labels.index(label))
+            color_dict[keys[key]] = ct[keys[key]]
+        
+        scores.append(calinski_harabasz_score(seq_embeddings[select_index], color))
+        scores.append(calinski_harabasz_score(z_tsne_seq[select_index], color))
+        scatter_labeled_z(z_tsne_seq[select_index], color,
+                          filename=os.path.join(out_figure_path, f"step_{steps}_CATH_{digit_num}.png"))
+        # add kmeans
+        kmeans = KMeans(n_clusters=len(color_dict), random_state=42)
+        predicted_labels = kmeans.fit_predict(z_tsne_seq[select_index])
+        predicted_colors = [color_dict[label] for label in predicted_labels]
+        #scatter_labeled_z(z_tsne_seq[select_index], predicted_colors,
+        #                  filename=os.path.join(out_figure_path, f"step_{steps}_CATH_{digit_num}_kmpred.png"))
+        ari = adjusted_rand_score(colorid, predicted_labels)
+        scores.append(ari)
+        scores.append(silhouette_score(seq_embeddings[select_index], color))
+    return scores  # [digit_num1_full,digit_num_2d,digit_num2_full,digit_num2_2d]
+
+
+def evaluate_with_deaminase_md(out_figure_path, model, steps, accelerator, batch_size, batch_converter, deaminasepath):
+    """
+    esmType: "lora","adapter","fine-tune"
+    """
+    # need to install openpyxl
+    Path(out_figure_path).mkdir(parents=True, exist_ok=True)
+    
+    seq_embeddings = []
+    data_frame = pd.read_excel(deaminasepath, engine='openpyxl')
+    column_condition = data_frame['Used in Structure Tree'] == '√'
+    labels = data_frame.loc[column_condition, 'Family '].tolist()
+    seqs = data_frame.loc[column_condition, 'Domain seq in HMMSCAN'].tolist()
+    
+    from torch.utils.data import DataLoader, Dataset
+    
+    class DataSet(Dataset):
+        def __init__(self, pad_seq):
+            self.pad_seq = pad_seq
+        
+        def __len__(self):
+            return len(self.pad_seq)
+        
+        def __getitem__(self, index):
+            return index, self.pad_seq[index]
+    
+    dataset_val = DataSet(seqs)
+    val_loader = DataLoader(dataset_val, batch_size=batch_size, num_workers=0, pin_memory=False, drop_last=False)
+    # val_loader = accelerator.prepare(val_loader)
+    
+    # model_prepresent.eval()
+    for batch in val_loader:
+        batch_seq = [(batch[0][i].item(), str(batch[1][i])) for i in range(len(batch[0]))]
+        with torch.inference_mode():
+            batch_labels, batch_strs, batch_tokens = batch_converter(batch_seq)
+            batch_tokens = batch_tokens.to(accelerator.device)
+            model_signature = signature(model.forward)
+            if 'batch_tokens' in model_signature.parameters:
+                _, _, features_seq, _  = model(batch_tokens=batch_tokens, mode='sequence', return_embedding=True)
+            else:
+                _, _, features_seq, _  = model(batch_tokens, mode='sequence', return_embedding=True)
+            
+            seq_embeddings.extend(features_seq.cpu().detach().numpy())
+    
+    seq_embeddings = np.asarray(seq_embeddings)
+    mdel = TSNE(n_components=2, random_state=0, init='random',method='exact')
+    # print("Projecting to 2D by TSNE\n")
+    z_tsne_seq = mdel.fit_transform(seq_embeddings)
+    scores = []
+    color = []
+    colorid = []
+    keys = {}
+    colorindex = 0
+    
+    ct = {"JAB": (154 / 255, 99 / 255, 36 / 255),
+          "A_deamin": (253 / 255, 203 / 255, 110 / 255),
+          "AICARFT_IMPCHas": (58 / 255, 179 / 255, 73 / 255),
+          "APOBEC": (255 / 255, 114 / 255, 114 / 255),
+          "Bd3614-deam": (63 / 255, 96 / 255, 215 / 255),
+          "Bd3615-deam": (63 / 255, 96 / 255, 215 / 255),  # no this in the paper
+          "dCMP_cyt_deam_1": (151 / 255, 130 / 255, 255 / 255),
+          "dCMP_cyt_deam_2": (151 / 255, 130 / 255, 255 / 255),  # note!
+          "FdhD-NarQ": (141 / 255, 23 / 255, 178 / 255),
+          "Inv-AAD": (62 / 255, 211 / 255, 244 / 255),
+          "LmjF365940-deam": (190 / 255, 239 / 255, 65 / 255),
+          "LpxI_C": (250 / 255, 190 / 255, 212 / 255),
+          "MafB19-deam": (220 / 255, 189 / 255, 255 / 255),
+          "Pput2613-deam": (168 / 255, 168 / 255, 168 / 255),  # DddA-like renamed into SCP1.201_deam
+          "DddA-like": (65 / 255, 150 / 255, 168 / 255),
+          "TM1506": (255 / 255, 255 / 255, 0 / 255),
+          "Toxin-deaminase": (126 / 255, 0, 0),
+          "XOO_2897-deam": (245 / 255, 128 / 255, 46 / 255),
+          "YwqJ-deaminase": (124 / 255, 124 / 255, 0)
+          }
+    
+    color_dict = {}
+    for label in labels:
+        key = label
+        if key not in keys:
+            keys[key] = colorindex
+            colorindex += 1
+        
+        colorid.append(keys[key])
+        color.append(ct[key])
+        color_dict[keys[key]] = ct[key]
+    
+    scores.append(calinski_harabasz_score(seq_embeddings, colorid))
+    scores.append(calinski_harabasz_score(z_tsne_seq, colorid))
+    scatter_labeled_z(z_tsne_seq, color, filename=os.path.join(out_figure_path, f"step_{steps}_deaminase.png"))
+    # add kmeans evaluation
+    kmeans = KMeans(n_clusters=len(color_dict), random_state=42)
+    # predicted_labels = kmeans.fit_predict(seq_embeddings)
+    predicted_labels = kmeans.fit_predict(z_tsne_seq)
+    predicted_colors = [color_dict[label] for label in predicted_labels]
+    #scatter_labeled_z(z_tsne_seq, predicted_colors,
+    #                  filename=os.path.join(out_figure_path, f"step_{steps}_deaminase_kmpred.png"))
+    ari = adjusted_rand_score(colorid, predicted_labels)
+    scores.append(ari)
+    scores.append(silhouette_score(seq_embeddings, colorid))
+    return scores  # [score,2d_score]
+
+
+def evaluate_with_kinase_md(out_figure_path, steps, batch_converter, batch_size, kinasepath, model, accelerator):
+    """
+    esmType: "lora","adapter","fine-tune"
+    """
+    Path(out_figure_path).mkdir(parents=True, exist_ok=True)
+    seq_embeddings = []
+    
+    data_frame = pd.read_csv(kinasepath, sep="\t")
+    data_frame = data_frame.drop_duplicates(subset='Kinase_Entrez_Symbol', keep='first')
+    column_condition = data_frame['Kinase_domain'] != ' '
+    labels = data_frame.loc[column_condition, 'Kinase_group'].tolist()
+    seqs = data_frame.loc[column_condition, 'Kinase_domain'].tolist()
+    
+    from torch.utils.data import DataLoader, Dataset
+    
+    class DataSet(Dataset):
+        def __init__(self, pad_seq):
+            self.pad_seq = pad_seq
+        
+        def __len__(self):
+            return len(self.pad_seq)
+        
+        def __getitem__(self, index):
+            return index, self.pad_seq[index]
+    
+    dataset_val = DataSet(seqs)
+    val_loader = DataLoader(dataset_val, batch_size=batch_size, num_workers=0, pin_memory=False, drop_last=False)
+    # val_loader = accelerator.prepare(val_loader)
+    
+    # model_prepresent.eval()
+    for batch in val_loader:
+        batch_seq = [(batch[0][i].item(), str(batch[1][i])) for i in range(len(batch[0]))]
+        with torch.inference_mode():
+            batch_labels, batch_strs, batch_tokens = batch_converter(batch_seq)
+            batch_tokens = batch_tokens.to(accelerator.device)
+            model_signature = signature(model.forward)
+            if 'batch_tokens' in model_signature.parameters:
+                _, _, features_seq, _  = model(batch_tokens=batch_tokens, mode='sequence', return_embedding=True)
+            else:
+                _, _, features_seq, _  = model(batch_tokens, mode='sequence', return_embedding=True)
+            
+            seq_embeddings.extend(features_seq.cpu().detach().numpy())
+    
+    seq_embeddings = np.asarray(seq_embeddings)
+    # print(seq_embeddings.shape)
+    mdel = TSNE(n_components=2, random_state=0, init='random',method='exact')
+    # print("Projecting to 2D by TSNE\n")
+    z_tsne_seq = mdel.fit_transform(seq_embeddings)
+    scores = []
+    
+    color = []
+    colorid = []
+    keys = {}
+    colorindex = 0
+    ct = {"AGC": (154 / 255, 99 / 255, 36 / 255),
+          "Atypical": (253 / 255, 203 / 255, 110 / 255),
+          "Other": (58 / 255, 179 / 255, 73 / 255),
+          "STE": (255 / 255, 114 / 255, 114 / 255),
+          "TK": (63 / 255, 96 / 255, 215 / 255),
+          "CK1": (151 / 255, 130 / 255, 255 / 255),  # note!
+          "CMGC": (141 / 255, 23 / 255, 178 / 255),
+          "TKL": (62 / 255, 211 / 255, 244 / 255),
+          "CAMK": (190 / 255, 239 / 255, 65 / 255),
+          }
+    
+    color_dict = {}
+    for label in labels:
+        key = label
+        if key not in keys:
+            keys[key] = colorindex
+            colorindex += 1
+        
+        colorid.append(keys[key])
+        color.append(ct[key])
+        color_dict[keys[key]] = ct[key]
+    
+    # print(seq_embeddings.shape)
+    
+    scatter_labeled_z(z_tsne_seq, color, filename=os.path.join(out_figure_path, f"step_{steps}_kinase.png"))
+    scores.append(calinski_harabasz_score(seq_embeddings, colorid[:len(seq_embeddings)]))
+    scores.append(calinski_harabasz_score(z_tsne_seq, colorid[:len(seq_embeddings)]))
+    kmeans = KMeans(n_clusters=len(color_dict), random_state=42)
+    predicted_labels = kmeans.fit_predict(z_tsne_seq)
+    # predicted_labels = kmeans.fit_predict(seq_embeddings)
+    predicted_colors = [color_dict[label] for label in predicted_labels]
+    ari = adjusted_rand_score(colorid, predicted_labels)
+    #scatter_labeled_z(z_tsne_seq, predicted_colors,
+    #                  filename=os.path.join(out_figure_path, f"step_{steps}_kinase_kmpred.png"))
+    scores.append(ari)
+    scores.append(silhouette_score(seq_embeddings, colorid[:len(seq_embeddings)]))
+    
+    return scores  # [digit_num1_full,digit_num_2d,digit_num2_full,digit_num2_2d]
 
 def evaluate_with_cath_more(out_figure_path, steps, accelerator, batch_size, model, batch_converter, cathpath):
     Path(out_figure_path).mkdir(parents=True, exist_ok=True)

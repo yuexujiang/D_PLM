@@ -14,7 +14,8 @@ from utils.utils import prepare_optimizer, load_checkpoints, save_checkpoints, l
     prepare_saving_dir
 from utils.utils import get_logging, prepare_tensorboard
 from utils.utils import accuracy, residue_batch_sample
-from utils.evaluation import evaluate_with_deaminase, evaluate_with_kinase, evaluate_with_cath_more
+from utils.evaluation import evaluate_with_deaminase, evaluate_with_kinase, evaluate_with_cath_more, \
+                             evaluate_with_deaminase_md, evaluate_with_kinase_md, evaluate_with_cath_more_md
 from utils.cath_with_struct import evaluate_with_cath_more_struct
 
 
@@ -268,7 +269,7 @@ def prepare_loss_MD(simclr,traj,batch_tokens,criterion, loss,
 
 def training_loop_MD(simclr, start_step, train_loader, val_loader, test_loader, batch_converter, criterion,
                   optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, train_writer, valid_writer,
-                  result_path, logging, configs, masked_lm_data_collator=None, **kwargs):
+                  result_path, logging, configs, replicate, masked_lm_data_collator=None, **kwargs):
     torch.cuda.empty_cache()
     accelerator = kwargs['accelerator']
 
@@ -383,16 +384,20 @@ def training_loop_MD(simclr, start_step, train_loader, val_loader, test_loader, 
                 train_loss = 0
 
             n_sub_steps += 1
-            if n_steps > configs.train_settings.num_steps:
+            repli_num = configs.train_settings.num_steps if replicate == 2 else (configs.train_settings.num_steps // 3) * (replicate + 1)
+            if n_steps > repli_num:
                 break
 
         end = time.time()
 
-        if n_steps > configs.train_settings.num_steps:
+        repli_num = configs.train_settings.num_steps if replicate == 2 else (configs.train_settings.num_steps // 3) * (replicate + 1)
+        if n_steps > repli_num:
             break
 
         if accelerator.is_main_process:
             logging.info(f"one epoch cost {(end - start):.2f}, number of trained steps {n_steps}")
+
+    return n_steps, accelerator, optimizer_x, optimizer_seq, scheduler_x, scheduler_seq
 
 def evaluation_loop_MD(simclr, val_loader, labels, batch_converter, criterion, configs, logging, **kwargs):
     accelerator = kwargs['accelerator']
@@ -516,8 +521,91 @@ def evaluation_loop_MD(simclr, val_loader, labels, batch_converter, criterion, c
         valid_writer.add_scalar('n_st_s', val_negsim_struct_seq, n_steps)
         valid_writer.add_scalar('n_s_s', val_negsim_seq_seq, n_steps)
 
+        seq_evaluation_loop_MD(simclr, n_steps, configs, batch_converter, result_path, valid_writer, logging, accelerator)
+
+    return n_steps
+
     # if accelerator.is_main_process:
     #    seq_evaluation_loop(simclr, n_steps, configs, batch_converter, result_path, valid_writer, logging, accelerator)
+def seq_evaluation_loop_MD(simclr, n_steps, configs, batch_converter, result_path, valid_writer, logging, accelerator):
+    # print("batchsize="+str(int(configs.train_settings.batch_size / 2)))
+    logging.info(f'seq evaluation - step {n_steps}')
+    simclr.eval()
+    scores_cath = evaluate_with_cath_more_md(
+        out_figure_path=os.path.join(result_path, 'figures'),
+        steps=n_steps,
+        batch_size=1,#int(configs.train_settings.batch_size / 2),
+        cathpath=configs.valid_settings.cath_path,
+        model=simclr,
+        accelerator=accelerator,
+        batch_converter=batch_converter
+    )
+
+    scores_deaminase = evaluate_with_deaminase_md(
+        out_figure_path=os.path.join(result_path, 'figures'),
+        steps=n_steps,
+        batch_size=1, #int(configs.train_settings.batch_size / 2),
+        deaminasepath=configs.valid_settings.deaminase_path,
+        model=simclr,
+        batch_converter=batch_converter,
+        accelerator=accelerator
+    )
+
+    scores_kinase = evaluate_with_kinase_md(out_figure_path=os.path.join(result_path, 'figures'),
+                                         steps=n_steps,
+                                         batch_size=1, #int(configs.train_settings.batch_size / 2),
+                                         kinasepath=configs.valid_settings.kinase_path,
+                                         model=simclr,
+                                         batch_converter=batch_converter,
+                                         accelerator=accelerator
+                                         )
+    if accelerator.is_main_process:
+        valid_writer.add_scalar('digit_num_1', scores_cath[0], n_steps)
+        valid_writer.add_scalar('digit_num_1_2d', scores_cath[1], n_steps)
+        
+        valid_writer.add_scalar('digit_num_2', scores_cath[4], n_steps)
+        valid_writer.add_scalar('digit_num_2_2d', scores_cath[5], n_steps)
+        
+        valid_writer.add_scalar('digit_num_3', scores_cath[8], n_steps)
+        valid_writer.add_scalar('digit_num_3_2d', scores_cath[9], n_steps)
+        
+        valid_writer.add_scalar('digit_num_1_ARI', scores_cath[2], n_steps)
+        valid_writer.add_scalar('digit_num_2_ARI', scores_cath[6], n_steps)
+        valid_writer.add_scalar('digit_num_3_ARI', scores_cath[10], n_steps)
+        
+        valid_writer.add_scalar('digit_num_1_silhouette', scores_cath[3], n_steps)
+        valid_writer.add_scalar('digit_num_2_silhouette', scores_cath[7], n_steps)
+        valid_writer.add_scalar('digit_num_3_silhouette', scores_cath[11], n_steps)
+        
+        valid_writer.add_scalar('tdeaminase_score', scores_deaminase[0], n_steps)
+        valid_writer.add_scalar('tdeaminase_score_2D', scores_deaminase[1], n_steps)
+        valid_writer.add_scalar('tdeaminase_ARI', scores_deaminase[2], n_steps)
+        valid_writer.add_scalar('tdeaminase_silhouette', scores_deaminase[3], n_steps)
+        
+        valid_writer.add_scalar('tkinase_score', scores_kinase[0], n_steps)
+        valid_writer.add_scalar('tkinase_score_2D', scores_kinase[1], n_steps)
+        valid_writer.add_scalar('tkinase_ARI', scores_kinase[2], n_steps)
+        valid_writer.add_scalar('tkinase_silhouette', scores_kinase[3], n_steps)
+
+        logging.info(
+            f"step:{n_steps}\tdigit_num_1:{scores_cath[0]:.4f}({scores_cath[1]:.4f})\t"
+            f"digit_num_2:{scores_cath[4]:.4f}({scores_cath[5]:.4f})\t"
+            f"digit_num_3:{scores_cath[8]:.4f}({scores_cath[9]:.4f})")
+        
+        logging.info(
+            f"step:{n_steps}\tdigit_num_1_ARI:{scores_cath[2]}\tdigit_num_2_ARI:{scores_cath[6]}\t"
+            f"digit_num_3_ARI:{scores_cath[10]}")
+        
+        logging.info(
+            f"step:{n_steps}\tdigit_num_1_silhouette:{scores_cath[3]}\tdigit_num_2_silhouette:{scores_cath[7]}\t"
+            f"digit_num_3_silhouette:{scores_cath[11]}")
+        
+        logging.info(
+            f"step:{n_steps}\tdeaminase_score:{scores_deaminase[0]:.4f}({scores_deaminase[1]:.4f})\t"
+            f"ARI:{scores_deaminase[2]:.4f} silhouette:{scores_deaminase[3]:.4f}")
+        logging.info(
+            f"step:{n_steps}\tkinase_score:{scores_kinase[0]:.4f}({scores_kinase[1]:.4f})\t"
+            f"ARI:{scores_kinase[2]:.4f} silhouette:{scores_kinase[3]:.4f}")
 
 def evaluation_loop(simclr, val_loader, labels, labels_residue, batch_converter, criterion, configs, logging, **kwargs):
     accelerator = kwargs['accelerator']
@@ -698,7 +786,7 @@ def seq_evaluation_loop(simclr, n_steps, configs, batch_converter, result_path, 
     scores_cath = evaluate_with_cath_more(
         out_figure_path=os.path.join(result_path, 'figures'),
         steps=n_steps,
-        batch_size=int(configs.train_settings.batch_size / 2),
+        batch_size=1, #int(configs.train_settings.batch_size / 2),
         cathpath=configs.valid_settings.cath_path,
         model=simclr,
         accelerator=accelerator,
@@ -708,7 +796,7 @@ def seq_evaluation_loop(simclr, n_steps, configs, batch_converter, result_path, 
     scores_deaminase = evaluate_with_deaminase(
         out_figure_path=os.path.join(result_path, 'figures'),
         steps=n_steps,
-        batch_size=int(configs.train_settings.batch_size / 2),
+        batch_size=1, #int(configs.train_settings.batch_size / 2),
         deaminasepath=configs.valid_settings.deaminase_path,
         model=simclr,
         batch_converter=batch_converter,
@@ -717,7 +805,7 @@ def seq_evaluation_loop(simclr, n_steps, configs, batch_converter, result_path, 
 
     scores_kinase = evaluate_with_kinase(out_figure_path=os.path.join(result_path, 'figures'),
                                          steps=n_steps,
-                                         batch_size=int(configs.train_settings.batch_size / 2),
+                                         batch_size=1, #int(configs.train_settings.batch_size / 2),
                                          kinasepath=configs.valid_settings.kinase_path,
                                          model=simclr,
                                          batch_converter=batch_converter,
@@ -895,15 +983,18 @@ def main(args, dict_configs, config_file_path):
             result_path, logging, configs, masked_lm_data_collator=masked_lm_data_collator, accelerator=accelerator
         )
     elif configs.model.X_module == 'MD':
-        training_loop_MD(simclr, start_step, train_dataloader_repli_0, val_dataloader_repli_0, test_dataloader_repli_0, batch_converter, criterion,
-                  optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, train_writer, valid_writer,
-                  result_path, logging, configs, masked_lm_data_collator=masked_lm_data_collator, accelerator=accelerator)
-        training_loop_MD(simclr, start_step, train_dataloader_repli_1, val_dataloader_repli_1, test_dataloader_repli_1, batch_converter, criterion,
-                  optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, train_writer, valid_writer,
-                  result_path, logging, configs, masked_lm_data_collator=masked_lm_data_collator, accelerator=accelerator)
-        training_loop_MD(simclr, start_step, train_dataloader_repli_2, val_dataloader_repli_2, test_dataloader_repli_2, batch_converter, criterion,
-                  optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, train_writer, valid_writer,
-                  result_path, logging, configs, masked_lm_data_collator=masked_lm_data_collator, accelerator=accelerator)
+        start_step, accelerator, optimizer_x, optimizer_seq, scheduler_x, scheduler_seq = training_loop_MD(
+            simclr, start_step, train_dataloader_repli_0, val_dataloader_repli_0, test_dataloader_repli_0, batch_converter, criterion,
+            optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, train_writer, valid_writer,
+            result_path, logging, configs, replicate=0, masked_lm_data_collator=masked_lm_data_collator, accelerator=accelerator)
+        start_step, accelerator, optimizer_x, optimizer_seq, scheduler_x, scheduler_seq = training_loop_MD(
+            simclr, start_step, train_dataloader_repli_1, val_dataloader_repli_1, test_dataloader_repli_1, batch_converter, criterion,
+            optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, train_writer, valid_writer,
+            result_path, logging, configs, replicate=1, masked_lm_data_collator=masked_lm_data_collator, accelerator=accelerator)
+        start_step, accelerator, optimizer_x, optimizer_seq, scheduler_x, scheduler_seq = training_loop_MD(
+            simclr, start_step, train_dataloader_repli_2, val_dataloader_repli_2, test_dataloader_repli_2, batch_converter, criterion,
+            optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, train_writer, valid_writer,
+            result_path, logging, configs, replicate=2, masked_lm_data_collator=masked_lm_data_collator, accelerator=accelerator)
 
     train_writer.close()
     valid_writer.close()

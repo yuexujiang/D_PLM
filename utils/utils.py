@@ -263,7 +263,7 @@ def load_checkpoints(simclr, configs, optimizer_seq,optimizer_struct,scheduler_s
 
 
 
-def save_checkpoints(optimizer_struct, optimizer_seq, result_path, simclr, n_steps, logging, epoch):
+def save_checkpoints(optimizer_x, optimizer_seq, result_path, simclr, n_steps, logging, epoch):
     checkpoint_name = f'checkpoint_{n_steps:07d}.pth'
     save_path = os.path.join(result_path, 'checkpoints', checkpoint_name)
 
@@ -271,8 +271,8 @@ def save_checkpoints(optimizer_struct, optimizer_seq, result_path, simclr, n_ste
         'epoch': epoch,
         'step': n_steps,
         'state_dict1': simclr.model_seq.state_dict(),
-        'state_dict2': simclr.model_struct.state_dict(),
-        'optimizer_struct': optimizer_struct.state_dict(),
+        'state_x': simclr.model_x.state_dict(),
+        'optimizer_x': optimizer_x.state_dict(),
         'optimizer_seq': optimizer_seq.state_dict(),
     }, is_best=False, filename=save_path)
     logging.info(f"Model checkpoint and metadata have been saved at {save_path}")

@@ -83,7 +83,7 @@ train_settings:
   Atlas_test_repli_0_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_test_rep0
   Atlas_test_repli_1_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_test_rep1
   Atlas_test_repli_2_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_test_rep2
-  num_steps: 10000 #10000000
+  num_steps: 30000 #10000000
   shuffle: True
   mixed_precision: "fp16" # no, fp16, bf16, fp8
   batch_size: 64
