@@ -10,7 +10,7 @@ from model import prepare_models, AverageMeter, info_nce_loss, info_nce_weights
 from model import log_negative_mean_logtis
 from model import MaskedLMDataCollator
 
-from utils.utils import prepare_optimizer, load_checkpoints, save_checkpoints, load_configs, test_gpu_cuda, \
+from utils.utils import prepare_optimizer, load_checkpoints, load_checkpoints_md, save_checkpoints, load_configs, test_gpu_cuda, \
     prepare_saving_dir
 from utils.utils import get_logging, prepare_tensorboard
 from utils.utils import accuracy, residue_batch_sample
@@ -920,7 +920,12 @@ def main(args, dict_configs, config_file_path):
     
     start_step = 0
     if configs.resume.resume:
-       simclr,start_step = load_checkpoints(simclr, configs, 
+       if configs.model.X_module == 'MD':
+           simclr,start_step, best_score = load_checkpoints_md(simclr, configs, 
+                           optimizer_seq,optimizer_x,scheduler_seq,scheduler_x,
+                           logging,resume_path=configs.resume.resume_path,restart_optimizer=configs.resume.restart_optimizer)
+       if configs.model.X_module == 'structure':
+           simclr,start_step = load_checkpoints(simclr, configs, 
                            optimizer_seq,optimizer_x,scheduler_seq,scheduler_x,
                            logging,resume_path=configs.resume.result_path,restart_optimizer=configs.resume.restart_optimizer)
     

@@ -261,7 +261,40 @@ def load_checkpoints(simclr, configs, optimizer_seq,optimizer_struct,scheduler_s
 
     return simclr,start_step,best_score
 
+def load_checkpoints_md(simclr, configs,  
+                        optimizer_seq, optimizer_x, scheduler_seq, scheduler_x,
+                        logging, resume_path, restart_optimizer=False):
+    start_step=0
+    best_score = None
+    assert os.path.exists(resume_path), (f'resume_path not exits')
+    checkpoint = torch.load(resume_path)  # , map_location=lambda storage, loc: storage)
+    print(f"load checkpoints from {resume_path}")
+    logging.info(f"load checkpoints from {resume_path}")
+    
+    if "state_dict1" in checkpoint: 
+        simclr.model_seq.load_state_dict(checkpoint['state_dict1'])
+    
+    if "state_x" in checkpoint:
+         simclr.model_x.load_state_dict(checkpoint['state_x'])
+    
+    if 'step' in checkpoint:
+        if not restart_optimizer:
+            if 'optimizer_x' in checkpoint and "scheduler_x" in checkpoint:
+                optimizer_x.load_state_dict(checkpoint['optimizer_x'])
+                logging.info('optimizer_x is loaded to resume training!')
+                scheduler_x.load_state_dict(checkpoint['scheduler_x'])
+                logging.info('scheduler_x is loaded to resume training!')
+            if 'optimizer_seq' in checkpoint and 'scheduler_seq' in checkpoint:
+                optimizer_seq.load_state_dict(checkpoint['optimizer_seq'])
+                logging.info('optimizer_seq is loaded to resume training!')
+                scheduler_seq.load_state_dict(checkpoint['scheduler_seq'])
+                logging.info('scheduler_seq is loaded to resume training!')
+        
+        start_step = checkpoint['step'] + 1
 
+    if 'best_score' in checkpoint:
+        best_score = checkpoint['best_score']
+    return simclr,start_step,best_score
 
 def save_checkpoints(optimizer_x, optimizer_seq, result_path, simclr, n_steps, logging, epoch):
     checkpoint_name = f'checkpoint_{n_steps:07d}.pth'

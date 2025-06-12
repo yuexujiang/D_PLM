@@ -6,7 +6,7 @@ result_path: ./results/test
 
 resume:
   resume: False
-  resume_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/results/test2/checkpoints/checkpoint_0030000.pth
+  resume_path: testadapterh_12tuneall_sgdlr001mixlenpad_esmpool2/checkpoints/checkpoint_0040000.pth
   restart_optimizer: True
 
 model:
@@ -44,6 +44,10 @@ model:
       resume:
         enable: False
         checkpoint_path: path/to/checkpoints.pth
+    MLM:
+      enable: True
+      mask_ratio: 0.15
+      mode: "predict"
   struct_encoder:
     version: v2 #v1 or v2
     residue_inner_dim: 1024
@@ -126,4 +130,4 @@ optimizer:
     min_lr_struct: 0
     min_lr_MD: 0
     gamma: 1
-    first_cycle_steps: 80 #2000
+    first_cycle_steps: 80

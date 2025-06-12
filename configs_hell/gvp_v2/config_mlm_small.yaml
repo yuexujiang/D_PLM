@@ -6,12 +6,12 @@ result_path: ./results/test
 
 resume:
   resume: False
-  resume_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/results/test2/checkpoints/checkpoint_0030000.pth
+  resume_path: testadapterh_12tuneall_sgdlr001mixlenpad_esmpool2/checkpoints/checkpoint_0040000.pth
   restart_optimizer: True
 
 model:
   residue_out_dim: 64
-  protein_out_dim: 256
+  protein_out_dim: 512 #256
   residue_num_projector: 1
   protein_num_projector: 2
   X_module: MD #structure
@@ -19,7 +19,7 @@ model:
   MD_encoder:
     model_name: google/vivit-b-16x2-kinetics400
     residue_inner_dim: 1024
-    protein_inner_dim: 4096
+    protein_inner_dim: 2048
     fine_tuning:
          enable: False
     fine_tuning_projct:
@@ -28,7 +28,7 @@ model:
     model_name:  esm2_t33_650M_UR50D # esm2_t33_650M_UR50D, esm2_t30_150M_UR50D, esm2_t12_35M_UR50D, esm2_t6_8M_UR50D
     max_length: 512
     residue_inner_dim: 1024
-    protein_inner_dim: 4096
+    protein_inner_dim: 2048
     fine_tuning:
       enable: False
       unfix_last_layer: 4
@@ -44,6 +44,10 @@ model:
       resume:
         enable: False
         checkpoint_path: path/to/checkpoints.pth
+    MLM:
+      enable: True
+      mask_ratio: 0.15
+      mode: "predict"
   struct_encoder:
     version: v2 #v1 or v2
     residue_inner_dim: 1024
@@ -126,4 +130,4 @@ optimizer:
     min_lr_struct: 0
     min_lr_MD: 0
     gamma: 1
-    first_cycle_steps: 80 #2000
+    first_cycle_steps: 80
