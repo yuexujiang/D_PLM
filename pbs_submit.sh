@@ -148,6 +148,95 @@ sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_nu
      -J ${task} \
      data_process.pbs
 
+task="data0"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
+num=0
+split_num=10
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_test'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+     
+task="data1"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
+num=1
+split_num=10
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_test'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+     
+task="data2"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
+num=2
+split_num=10
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_test'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+     
+task="data3"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
+num=3
+split_num=10
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_test'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+     
+task="data4"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
+num=4
+split_num=10
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_test'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+     
+task="data5"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
+num=5
+split_num=10
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_test'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+
+task="data6"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
+num=6
+split_num=10
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_test'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+
+task="data7"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
+num=7
+split_num=10
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_test'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+
+task="data8"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
+num=8
+split_num=10
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_test'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+
+task="data9"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
+num=9
+split_num=10
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_test'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
 
 
 task="DCCM_GNN"

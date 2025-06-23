@@ -66,7 +66,7 @@ def write_h5_file(file_path, rmsf, dccm, mi, pid, seq):
         f.create_dataset('dccm', data=dccm)
         f.create_dataset('mi', data=mi)
         f.create_dataset('pid', data=pid)
-        f.create_dataset('seq', data=seq.encode('utf-8'))
+        f.create_dataset('seq', data=str(seq).encode('utf-8'))
 
 
 
