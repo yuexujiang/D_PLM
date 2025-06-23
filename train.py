@@ -213,6 +213,147 @@ def training_loop(simclr, start_step,train_loader, val_loader, batch_converter, 
         if accelerator.is_main_process:
             logging.info(f"one epoch cost {(end - start):.2f}, number of trained steps {n_steps}")
 
+
+
+def training_loop_DCCM_GNN(simclr, start_step, train_loader, val_loader, test_loader, batch_converter, criterion,
+            optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, train_writer, valid_writer,
+            result_path, logging, configs, replicate, masked_lm_data_collator=None, **kwargs):
+    torch.cuda.empty_cache()
+    accelerator = kwargs['accelerator']
+
+    train_loss = 0
+    n_steps = start_step
+    n_sub_steps = start_step-1
+    epoch_num = 0
+    """
+    train_alt = False
+    if hasattr(configs.model.esm_encoder, "MLM"):
+        if configs.model.esm_encoder.MLM.enable and configs.model.esm_encoder.MLM.alt:
+            train_alt = True
+    """
+    
+    """
+    if accelerator.is_main_process:
+       seq_evaluation_loop(simclr, n_steps, configs, batch_converter, result_path, valid_writer,logging, accelerator)
+       struct_evaluation_loop(simclr, n_steps, configs, result_path, valid_writer,logging, accelerator)
+    """
+    while True:
+        epoch_num += 1
+        if accelerator.is_main_process:
+            logging.info(f"Epoch {epoch_num}")
+
+        losses = AverageMeter()
+        
+        progress_bar = tqdm(range(0, int(np.ceil(len(train_loader) / configs.train_settings.gradient_accumulation))),
+                            disable=True, leave=True, desc=f"Epoch {epoch_num} steps")
+        bsz = configs.train_settings.batch_size
+        start = time.time()
+        for idx, batch in enumerate(train_loader):
+            with accelerator.accumulate(simclr):
+                simclr.train()
+                batch_seq = [(batch['pid'][i], str(batch['seq'][i])) for i in range(len(batch['seq']))]  # batch['seq']
+                batch_labels, batch_strs, batch_tokens = batch_converter(batch_seq)
+                graph = batch["graph"]
+                # trajs = batch["traj"]
+                batch_tokens = batch_tokens.to(accelerator.device)
+                graph = graph.to(accelerator.device)
+                # trajs = trajs.to(accelerator.device)
+                # trajs = torch.tensor(np.array(trajs)).to(accelerator.device)
+                loss = torch.tensor(0).float()
+                loss = loss.to(accelerator.device)
+                loss, simclr_loss, simclr_residue_loss, MLM_loss,logits, labels, logits_residue, labels_residue= prepare_loss(
+                        simclr,graph,batch_tokens, None, criterion,loss, accelerator, configs,
+                        masked_lm_data_collator
+                        )
+                    
+
+                # Gather the losses across all processes for logging (if we use distributed training).
+                avg_loss = accelerator.gather(loss.repeat(configs.train_settings.batch_size)).mean()
+                train_loss += avg_loss.item() / configs.train_settings.gradient_accumulation
+
+                accelerator.backward(loss)
+
+                # Step the optimizers
+                if not (configs.model.DCCM_GNN_encoder.fine_tuning.enable is False and configs.model.DCCM_GNN_encoder.fine_tuning_projct.enable is False):
+                    optimizer_x.step()
+                
+                optimizer_seq.step()
+
+                # Step the schedulers
+                if not (configs.model.DCCM_GNN_encoder.fine_tuning.enable is False and configs.model.DCCM_GNN_encoder.fine_tuning_projct.enable is False):
+                    scheduler_x.step()
+                
+                scheduler_seq.step()
+
+                losses.update(loss.item(), bsz)
+
+                # Zero the parameter gradients
+                if not (configs.model.DCCM_GNN_encoder.fine_tuning.enable is False and configs.model.DCCM_GNN_encoder.fine_tuning_projct.enable is False):
+                    optimizer_x.zero_grad()
+                optimizer_seq.zero_grad()
+
+            if accelerator.sync_gradients:
+                train_writer.add_scalar('step loss', train_loss, n_steps)
+                train_writer.add_scalar('learning rate (MD)', optimizer_x.param_groups[0]['lr'], n_steps)
+                train_writer.add_scalar('learning rate (sequence)', optimizer_seq.param_groups[0]['lr'], n_steps)
+                # writer.add_scalar('loss', loss, global_step=n_steps)
+                # writer.add_scalar('acc/top1', top1[0], global_step=n_steps)
+
+                if n_steps % configs.checkpoints_every == 0 and n_steps != 0:
+                    # Wait for other processes to catch up
+                    print("save_checkpoints")
+                    accelerator.wait_for_everyone()
+                    # Save checkpoint
+                    save_checkpoints(accelerator.unwrap_model(optimizer_x),
+                                     accelerator.unwrap_model(optimizer_seq),
+                                     result_path, accelerator.unwrap_model(simclr), n_steps, logging, epoch_num)
+
+                # todo: add tensorboard here
+                if n_steps % configs.valid_settings.do_every == 0 and n_steps != 0:  # I want to see the step evaluations
+                    print("in evaluation loop")
+                    # Protein level
+                    accelerator.wait_for_everyone()
+                    # evaluation_loop_MD(simclr, val_loader, labels, batch_converter, criterion, configs,
+                    #                 simclr_loss=simclr_loss, MLM_loss = MLM_loss,losses=losses,
+                    #                 n_steps=n_steps, scheduler_seq=scheduler_seq, result_path=result_path,
+                    #                 scheduler_x=scheduler_x, logits=logits, 
+                    #                 loss=loss, bsz=bsz, train_writer=train_writer,valid_writer=valid_writer,
+                    #                 masked_lm_data_collator=masked_lm_data_collator, logging=logging,
+                    #                 accelerator=accelerator)
+                    evaluation_loop(simclr, val_loader, labels, labels_residue, batch_converter, criterion, configs,
+                                    simclr_loss=simclr_loss, simclr_residue_loss=simclr_residue_loss, MLM_loss = MLM_loss,losses=losses,
+                                    n_steps=n_steps, scheduler_seq=scheduler_seq, result_path=result_path,
+                                    scheduler_struct=scheduler_x, logits=logits, logits_residue=logits_residue,
+                                    loss=loss, bsz=bsz, train_writer=train_writer,valid_writer=valid_writer,
+                                    masked_lm_data_collator=masked_lm_data_collator, logging=logging,
+                                    accelerator=accelerator)
+
+                # if configs.valid_settings.eval_struct.enable and (
+                #         n_steps % configs.valid_settings.eval_struct.do_every == 0) and n_steps != 0:  # or n_steps == 1):
+                #     accelerator.wait_for_everyone()
+                #     if accelerator.is_main_process:
+                #        struct_evaluation_loop(simclr, n_steps, configs, result_path, valid_writer,logging, accelerator)
+
+                progress_bar.update(1)
+                n_steps += 1
+                train_loss = 0
+
+            n_sub_steps += 1
+            repli_num = configs.train_settings.num_steps if replicate == 2 else (configs.train_settings.num_steps // 3) * (replicate + 1)
+            if n_steps > repli_num:
+                break
+
+        end = time.time()
+
+        repli_num = configs.train_settings.num_steps if replicate == 2 else (configs.train_settings.num_steps // 3) * (replicate + 1)
+        if n_steps > repli_num:
+            break
+
+        if accelerator.is_main_process:
+            logging.info(f"one epoch cost {(end - start):.2f}, number of trained steps {n_steps}")
+
+    return n_steps, accelerator, optimizer_x, optimizer_seq, scheduler_x, scheduler_seq
+
 def prepare_loss_MD(simclr,traj,batch_tokens,criterion, loss,
                  accelerator, configs,
                  masked_lm_data_collator
@@ -920,14 +1061,17 @@ def main(args, dict_configs, config_file_path):
     
     start_step = 0
     if configs.resume.resume:
-       if configs.model.X_module == 'MD':
-           simclr,start_step, best_score = load_checkpoints_md(simclr, configs, 
-                           optimizer_seq,optimizer_x,scheduler_seq,scheduler_x,
-                           logging,resume_path=configs.resume.resume_path,restart_optimizer=configs.resume.restart_optimizer)
-       if configs.model.X_module == 'structure':
-           simclr,start_step = load_checkpoints(simclr, configs, 
-                           optimizer_seq,optimizer_x,scheduler_seq,scheduler_x,
-                           logging,resume_path=configs.resume.result_path,restart_optimizer=configs.resume.restart_optimizer)
+        if configs.model.X_module == 'MD':
+            simclr,start_step, best_score = load_checkpoints_md(simclr, configs, 
+                            optimizer_seq,optimizer_x,scheduler_seq,scheduler_x,
+                            logging,resume_path=configs.resume.resume_path,restart_optimizer=configs.resume.restart_optimizer)
+        if configs.model.X_module == 'structure':
+            simclr,start_step = load_checkpoints(simclr, configs, 
+                            optimizer_seq,optimizer_x,scheduler_seq,scheduler_x,
+                            logging,resume_path=configs.resume.result_path,restart_optimizer=configs.resume.restart_optimizer)
+        if configs.model.X_module == 'DCCM_GNN':
+            print("to do...")
+            #xxx
     
     alphabet = simclr.model_seq.alphabet
     batch_converter = alphabet.get_batch_converter(truncation_seq_length=configs.model.esm_encoder.max_length)
@@ -939,18 +1083,34 @@ def main(args, dict_configs, config_file_path):
         masked_lm_data_collator = None
 
     if configs.model.X_module == 'MD':
-        from data.data_MD import prepare_dataloaders as prepare_dataloaders_v2
+        from data.data_MD import prepare_dataloaders
         ((train_dataloader_repli_0, val_dataloader_repli_0, test_dataloader_repli_0),
          (train_dataloader_repli_1, val_dataloader_repli_1, test_dataloader_repli_1),
-         (train_dataloader_repli_2, val_dataloader_repli_2, test_dataloader_repli_2)) = prepare_dataloaders_v2(configs)
+         (train_dataloader_repli_2, val_dataloader_repli_2, test_dataloader_repli_2)) = prepare_dataloaders(configs)
         # val_loader = prepare_dataloaders_v2(configs)
-    else:
+        ((train_dataloader_repli_0, val_dataloader_repli_0, test_dataloader_repli_0),
+        (train_dataloader_repli_1, val_dataloader_repli_1, test_dataloader_repli_1),
+        (train_dataloader_repli_2, val_dataloader_repli_2, test_dataloader_repli_2))=accelerator.prepare(((train_dataloader_repli_0, val_dataloader_repli_0, test_dataloader_repli_0),
+                                                                                                        (train_dataloader_repli_1, val_dataloader_repli_1, test_dataloader_repli_1),
+                                                                                                        (train_dataloader_repli_2, val_dataloader_repli_2, test_dataloader_repli_2)))
+    elif configs.model.X_module == 'DCCM_GNN':
+        from data.data_MD_feature_GNN import prepare_dataloaders
+        ((train_dataloader_repli_0, val_dataloader_repli_0, test_dataloader_repli_0),
+         (train_dataloader_repli_1, val_dataloader_repli_1, test_dataloader_repli_1),
+         (train_dataloader_repli_2, val_dataloader_repli_2, test_dataloader_repli_2)) = prepare_dataloaders(configs)
+        ((train_dataloader_repli_0, val_dataloader_repli_0, test_dataloader_repli_0),
+        (train_dataloader_repli_1, val_dataloader_repli_1, test_dataloader_repli_1),
+        (train_dataloader_repli_2, val_dataloader_repli_2, test_dataloader_repli_2))=accelerator.prepare(((train_dataloader_repli_0, val_dataloader_repli_0, test_dataloader_repli_0),
+                                                                                                        (train_dataloader_repli_1, val_dataloader_repli_1, test_dataloader_repli_1),
+                                                                                                        (train_dataloader_repli_2, val_dataloader_repli_2, test_dataloader_repli_2)))
+    elif configs.model.X_module == 'structure':
         if hasattr(configs.model.struct_encoder,"version") and configs.model.struct_encoder.version == 'v2':
             from data.data_v2 import prepare_dataloaders as prepare_dataloaders_v2
             train_loader, val_loader = prepare_dataloaders_v2(logging, accelerator, configs)
         else:
             from data.data import prepare_dataloaders
             train_loader, val_loader = prepare_dataloaders(logging, accelerator, configs)
+        train_loader, val_loader = accelerator.prepare(train_loader, val_loader)
     
     if accelerator.is_main_process:
         logging.info('preparing dataloaders are done')
@@ -959,14 +1119,7 @@ def main(args, dict_configs, config_file_path):
     simclr, scheduler_seq, scheduler_x, optimizer_seq, optimizer_x = accelerator.prepare(
         simclr, scheduler_seq, scheduler_x, optimizer_seq, optimizer_x
         )
-
-    # train_loader, val_loader = accelerator.prepare(train_loader, val_loader)
-    ((train_dataloader_repli_0, val_dataloader_repli_0, test_dataloader_repli_0),
-     (train_dataloader_repli_1, val_dataloader_repli_1, test_dataloader_repli_1),
-     (train_dataloader_repli_2, val_dataloader_repli_2, test_dataloader_repli_2))=accelerator.prepare(((train_dataloader_repli_0, val_dataloader_repli_0, test_dataloader_repli_0),
-                                                                                                       (train_dataloader_repli_1, val_dataloader_repli_1, test_dataloader_repli_1),
-                                                                                                       (train_dataloader_repli_2, val_dataloader_repli_2, test_dataloader_repli_2)))
-
+    
     criterion = torch.nn.CrossEntropyLoss(reduction='none')
 
     if accelerator.is_main_process:
@@ -975,7 +1128,7 @@ def main(args, dict_configs, config_file_path):
     if accelerator.is_main_process:
         if configs.model.X_module == 'structure':
             train_steps = np.ceil(len(train_loader) / configs.train_settings.gradient_accumulation)
-        elif configs.model.X_module == 'MD':
+        elif configs.model.X_module == 'MD' or configs.model.X_module == 'DCCM_GNN':
             train_steps = np.ceil(len(train_dataloader_repli_0) / configs.train_settings.gradient_accumulation)
             train_steps = train_steps * 3
         logging.info(f'Number of train steps per epoch: {int(train_steps)}')
@@ -997,6 +1150,19 @@ def main(args, dict_configs, config_file_path):
             optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, train_writer, valid_writer,
             result_path, logging, configs, replicate=1, masked_lm_data_collator=masked_lm_data_collator, accelerator=accelerator)
         start_step, accelerator, optimizer_x, optimizer_seq, scheduler_x, scheduler_seq = training_loop_MD(
+            simclr, start_step, train_dataloader_repli_2, val_dataloader_repli_2, test_dataloader_repli_2, batch_converter, criterion,
+            optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, train_writer, valid_writer,
+            result_path, logging, configs, replicate=2, masked_lm_data_collator=masked_lm_data_collator, accelerator=accelerator)
+    elif configs.model.X_module == 'DCCM_GNN':
+        start_step, accelerator, optimizer_x, optimizer_seq, scheduler_x, scheduler_seq = training_loop_DCCM_GNN(
+            simclr, start_step, train_dataloader_repli_0, val_dataloader_repli_0, test_dataloader_repli_0, batch_converter, criterion,
+            optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, train_writer, valid_writer,
+            result_path, logging, configs, replicate=0, masked_lm_data_collator=masked_lm_data_collator, accelerator=accelerator)
+        start_step, accelerator, optimizer_x, optimizer_seq, scheduler_x, scheduler_seq = training_loop_DCCM_GNN(
+            simclr, start_step, train_dataloader_repli_1, val_dataloader_repli_1, test_dataloader_repli_1, batch_converter, criterion,
+            optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, train_writer, valid_writer,
+            result_path, logging, configs, replicate=1, masked_lm_data_collator=masked_lm_data_collator, accelerator=accelerator)
+        start_step, accelerator, optimizer_x, optimizer_seq, scheduler_x, scheduler_seq = training_loop_DCCM_GNN(
             simclr, start_step, train_dataloader_repli_2, val_dataloader_repli_2, test_dataloader_repli_2, batch_converter, criterion,
             optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, train_writer, valid_writer,
             result_path, logging, configs, replicate=2, masked_lm_data_collator=masked_lm_data_collator, accelerator=accelerator)

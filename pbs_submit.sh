@@ -63,9 +63,96 @@ sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_nu
      data_process.pbs
 
 
-task="test"
+task="dplm"
 config_path='./configs_hell/gvp_v2/config.yaml'
-result_path='./results/test/'
+result_path='./results/dplm/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
+     
+task="resume_test2"
+config_path='./configs_hell/gvp_v2/config.yaml'
+result_path='./results/test2/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
+     
+task="mlm"
+config_path='./configs_hell/gvp_v2/config_mlm.yaml'
+result_path='./results/dplm_mlm/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
+     
+task="mlm_small"
+config_path='./configs_hell/gvp_v2/config_mlm_small.yaml'
+result_path='./results/dplm_mlm_small/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
+     
+
+
+     
+task="data0"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
+num=0
+split_num=6
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_data'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+     
+task="data1"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
+num=1
+split_num=6
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_data'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+     
+task="data2"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
+num=2
+split_num=6
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_data'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+     
+task="data3"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
+num=3
+split_num=6
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_data'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+     
+task="data4"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
+num=4
+split_num=6
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_data'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+     
+task="data5"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
+num=5
+split_num=6
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_data'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+
+
+
+task="DCCM_GNN"
+config_path='./configs_hell/gvp_v2/config_DCCM_GNN.yaml'
+result_path='./results/DCCM_GNN/'
 sbatch --export=config_path=$config_path,result_path=$result_path, \
      -J ${task} \
      run_yjm85.sh

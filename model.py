@@ -6,8 +6,11 @@ import esm_adapterH
 from peft import PeftModel, LoraConfig, get_peft_model
 import gvp.models
 # from gvp import GVP, GVPConvLayer, LayerNorm, tuple_index
-from torch_geometric.nn import radius, global_mean_pool, global_max_pool
-from transformers import VivitModel
+from torch_geometric.nn import global_mean_pool, global_max_pool, global_add_pool
+from torch_geometric.nn import MessagePassing
+import numpy as np
+
+
 def set_requires_grad(model, val):
     for p in model.parameters():
         p.requires_grad = val
@@ -308,6 +311,160 @@ class VIVIT(nn.Module):  # embedding table is fixed
         else:
             return graph_feature
 
+class EdgeGNNLayer(MessagePassing):
+    """
+    Custom GNN layer that incorporates edge features in message passing
+    """
+    def __init__(self, node_in_dim: int, edge_dim: int, node_out_dim: int):
+        super(EdgeGNNLayer, self).__init__(aggr='mean')
+        
+        # Node transformation
+        self.node_lin = nn.Linear(node_in_dim, node_out_dim)
+        
+        # Edge transformation 
+        self.edge_lin = nn.Linear(edge_dim, node_out_dim)
+        
+        # Message transformation
+        self.message_lin = nn.Linear(node_out_dim * 2 + edge_dim, node_out_dim)
+        
+        # Layer normalization and dropout
+        self.layer_norm = nn.LayerNorm(node_out_dim)
+        self.dropout = nn.Dropout(0.1)
+        
+    def forward(self, x, edge_index, edge_attr):
+        # Transform node features
+        x = self.node_lin(x)
+        
+        # Propagate messages
+        out = self.propagate(edge_index, x=x, edge_attr=edge_attr)
+        
+        # Add residual connection and apply layer norm
+        out = self.layer_norm(out + x)
+        out = self.dropout(out)
+        
+        return out
+    
+    def message(self, x_i, x_j, edge_attr):
+        # x_i: target node features [num_edges, node_dim]
+        # x_j: source node features [num_edges, node_dim] 
+        # edge_attr: edge features [num_edges, edge_dim]
+        
+        # Concatenate source node, target node, and edge features
+        msg_input = torch.cat([x_i, x_j, edge_attr], dim=1)
+        
+        # Transform concatenated features
+        message = self.message_lin(msg_input)
+        message = F.relu(message)
+        
+        return message
+
+class DCCM_GNN(nn.Module):
+    """
+    Unified Graph Neural Network for processing DCCM graphs with edge features.
+    Handles both single graphs and batched graphs automatically.
+    """
+    def __init__(self, 
+                 configs,
+                 node_input_dim: int = 10001,
+                 edge_dim: int = 2,
+                 hidden_dim: int = 512,
+                 output_dim: int = 100,
+                 num_layers: int = 3,
+                 residue_inner_dim=4096,
+                 residue_out_dim=256,
+                 residue_num_projector=2,
+                 protein_inner_dim=4096,
+                 protein_out_dim=256,
+                 protein_num_projector=2,
+                 pooling: str = 'mean'):
+        super(DCCM_GNN, self).__init__()
+        
+        
+        
+        self.num_layers = num_layers
+        self.pooling = pooling
+        
+        # Input projection
+        self.input_proj = nn.Linear(node_input_dim, hidden_dim)
+        
+        # GNN layers
+        self.gnn_layers = nn.ModuleList()
+        for i in range(num_layers):
+            layer = EdgeGNNLayer(
+                node_in_dim=hidden_dim,
+                edge_dim=edge_dim,
+                node_out_dim=hidden_dim
+            )
+            self.gnn_layers.append(layer)
+        
+        # Output projection
+        self.output_proj = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim // 2),
+            nn.ReLU(),
+            nn.Dropout(0.1),
+            nn.Linear(hidden_dim // 2, output_dim)
+        )
+
+        self.projectors_protein = MoBYMLP(in_dim=output_dim, inner_dim=protein_inner_dim, out_dim=protein_out_dim,
+                                          num_layers=protein_num_projector)
+
+        self.projectors_residue = MoBYMLP(in_dim=output_dim, inner_dim=residue_inner_dim, out_dim=residue_out_dim,
+                                          num_layers=residue_num_projector)
+        
+        if hasattr(configs.model.DCCM_GNN_encoder, "fine_tuning") and not configs.model.DCCM_GNN_encoder.fine_tuning.enable:
+            for name, param in self.input_proj.named_parameters():
+                param.requires_grad = False
+            for name, param in self.gnn_layers.named_parameters():
+                param.requires_grad = False
+            for name, param in self.output_proj.named_parameters():
+                param.requires_grad = False
+
+        if hasattr(configs.model.DCCM_GNN_encoder, "fine_tuning_projct") and not configs.model.DCCM_GNN_encoder.fine_tuning_projct.enable:
+            for name, param in self.projectors_protein.named_parameters():
+                param.requires_grad = False
+            
+            for name, param in self.projectors_residue.named_parameters():
+                param.requires_grad = False
+        # Pooling function (for graph-level representations)
+        if pooling == 'mean':
+            self.pool = global_mean_pool
+        elif pooling == 'max':
+            self.pool = global_max_pool
+        elif pooling == 'sum':
+            self.pool = global_add_pool
+        elif pooling is not None:
+            raise ValueError(f"Unsupported pooling: {pooling}")
+        
+    def forward(self, data, return_embedding=False):
+        x, edge_index, edge_attr = data.x, data.edge_index, data.edge_attr
+        
+        # Project input features
+        x = self.input_proj(x)
+        x = F.relu(x)
+        
+        # Apply GNN layers
+        for layer in self.gnn_layers:
+            x = layer(x, edge_index, edge_attr)
+        
+        # Final output projection
+        residue_emb = self.output_proj(x) #[batch_size * residue_num, dim]
+        
+        # Apply pooling if specified (for graph-level output)
+        if self.pooling is not None:
+            # Check if we have batch information (batched graphs)
+            if hasattr(data, 'batch'):
+                graph_emb = self.pool(residue_emb, data.batch)  # [batch_size, output_dim]
+            else:
+                # Single graph - pool all nodes
+                batch = torch.zeros(residue_emb.size(0), dtype=torch.long, device=x.device)
+                graph_emb = self.pool(residue_emb, batch)  # [1, output_dim]
+        
+        graph_feature = self.projectors_protein(graph_emb)
+        residue_feature = self.projectors_residue(residue_emb)
+        if return_embedding:
+            return graph_feature, residue_feature, graph_emb, residue_emb
+        else:
+            return graph_feature, residue_feature
 
 class ESM2(nn.Module):  # embedding table is fixed
     def __init__(self, esm2_pretrain, logging,
@@ -574,6 +731,8 @@ class SimCLR(nn.Module):
             return self.model_x(graph, return_embedding=return_embedding)
         elif mode =="MD":
             return self.model_x(graph)
+        elif mode == 'DCCM_GNN':
+            return self.model_x(graph, return_embedding=return_embedding)
         else:
             if self.configs.model.X_module == "structure":
                 features_seq, residue_seq = self.model_seq(batch_tokens)
@@ -583,6 +742,10 @@ class SimCLR(nn.Module):
                 features_seq, residue_seq = self.model_seq(batch_tokens)
                 features_MD = self.model_x(graph)
                 return features_MD, features_seq, residue_seq
+            if self.configs.model.X_module == "DCCM_GNN":
+                features_seq, residue_seq = self.model_seq(batch_tokens)
+                protein_MD_feature, residue_MD_feature = self.model_x(graph)
+                return protein_MD_feature, residue_MD_feature, features_seq, residue_seq
         
     # def forward_structure(self, graph):
     #     features_struct, residue_struct = self.model_struct(graph)
@@ -1169,6 +1332,25 @@ def prepare_models(logging, configs, accelerator):
           print_trainable_parameters(model_MD, logging)
         
         simclr = SimCLR(model_seq, model_MD, configs=configs)
+    elif configs.model.X_module == "DCCM_GNN":
+        model_DCCM_GNN = DCCM_GNN(configs=configs, node_input_dim=configs.model.DCCM_GNN_encoder.node_input_dim,
+                                  edge_dim = configs.model.DCCM_GNN_encoder.edge_dim,
+                                  hidden_dim = configs.model.DCCM_GNN_encoder.hidden_dim,
+                                  output_dim = configs.model.DCCM_GNN_encoder.output_dim,
+                                  num_layers = configs.model.DCCM_GNN_encoder.num_layers,
+                                  residue_inner_dim = configs.model.DCCM_GNN_encoder.residue_inner_dim,
+                                  residue_out_dim=configs.model.residue_out_dim,
+                                  residue_num_projector=configs.model.residue_num_projector,
+                                  protein_inner_dim=configs.model.DCCM_GNN_encoder.protein_inner_dim,
+                                  protein_out_dim=configs.model.protein_out_dim,
+                                  protein_num_projector=configs.model.protein_num_projector,
+                                  pooling = configs.model.DCCM_GNN_encoder.pooling)
+        
+        simclr = SimCLR(model_seq, model_DCCM_GNN, configs=configs)
+
+        if accelerator.is_main_process:
+          print_trainable_parameters(model_seq, logging)
+          print_trainable_parameters(model_DCCM_GNN, logging)
     elif configs.model.X_module == "structure":
         model_struct = GVPEncoder(configs=configs, residue_inner_dim=configs.model.struct_encoder.residue_inner_dim,
                               residue_out_dim=configs.model.residue_out_dim,

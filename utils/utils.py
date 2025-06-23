@@ -555,6 +555,9 @@ def residue_batch_sample(residue_struct, residue_seq, plddt_residue, sample_size
     # Index the tensors to get the sampled batch
     residue_struct = residue_struct[random_indices, :]
     residue_seq = residue_seq[random_indices, :]
-    plddt_residue = plddt_residue[random_indices]
+    if plddt_residue==None:
+        return residue_struct, residue_seq
+    else:
+        plddt_residue = plddt_residue[random_indices]
+        return residue_struct, residue_seq, plddt_residue
 
-    return residue_struct, residue_seq, plddt_residue
