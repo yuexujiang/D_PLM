@@ -4,6 +4,7 @@ from sklearn.metrics import mutual_info_score
 from scipy.spatial.distance import pdist, squareform
 import mdtraj as md
 from Bio.PDB import PDBParser, PPBuilder
+from .data_MD_feature_GNN import load_h5_file_v2
 import os
 import h5py
 import argparse
@@ -216,15 +217,40 @@ def add_id_seq_2h5(csv_path, h5_folder_path):
                 h5_path = os.path.join(h5_folder, h5_filename)
                 with h5py.File(h5_path, 'a') as f:  # Open in append mode
                     # Add the 'name' and 'sequence' as new datasets in the H5 file
-                    if 'name' not in f:
+                    if 'pid' not in f:
                         f.create_dataset('pid', data=name_part)
-                    if 'sequence' not in f:
+                    if 'seq' not in f:
                         f.create_dataset('seq', data=sequence.encode('utf-8'))  # Store sequence as bytes
                 
                 print(f"Added name and sequence to {h5_filename}")
             else:
                 print(f"Name {name_part} not found in the CSV for {h5_filename}")
 
+def check_h5py(folder2check, csv_file): # '/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/atlas.csv'
+    import os
+    import pandas as pd
+    import h5py
+    for h5_filename in os.listdir(folder2check):
+        if h5_filename.endswith('.h5'):
+            h5_path = os.path.join(folder2check, h5_filename)
+            # print(h5_path)
+            try:
+                rmsf, dccm, mi, seq, pid=load_h5_file_v2(h5_path)
+            except:
+                print(h5_path)
+                df = pd.read_csv(csv_file)
+                name_to_sequence = dict(zip(df['name'], df['seqres']))
+                name_part = '_'.join(h5_filename.split('_')[:2])
+                if name_part in name_to_sequence:
+                    sequence = name_to_sequence[name_part]
+                    with h5py.File(h5_path, 'a') as f:  # Open in append mode
+                        # Add the 'name' and 'sequence' as new datasets in the H5 file
+                        if 'pid' not in f:
+                            f.create_dataset('pid', data=name_part)
+                        if 'seq' not in f:
+                            f.create_dataset('seq', data=sequence.encode('utf-8'))  # Store sequence as bytes
+                    
+                    print(f"Added name and sequence to {h5_filename}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='PyTorch SimCLR')

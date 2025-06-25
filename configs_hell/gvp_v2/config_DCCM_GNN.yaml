@@ -25,13 +25,13 @@ model:
     fine_tuning_projct:
          enable: True
   DCCM_GNN_encoder:
-    node_input_dim: 10001
+    node_input_dim: 101
     edge_dim: 2
     hidden_dim: 128
-    output_dim: 100
+    output_dim: 64
     num_layers: 3
-    residue_inner_dim: 1024
-    protein_inner_dim: 4096
+    residue_inner_dim: 256 #1024
+    protein_inner_dim: 512 #4096
     pooling: mean
     fine_tuning:
          enable: True
@@ -40,8 +40,8 @@ model:
   esm_encoder:
     model_name:  esm2_t33_650M_UR50D # esm2_t33_650M_UR50D, esm2_t30_150M_UR50D, esm2_t12_35M_UR50D, esm2_t6_8M_UR50D
     max_length: 512
-    residue_inner_dim: 1024
-    protein_inner_dim: 4096
+    residue_inner_dim: 256 #1024
+    protein_inner_dim: 512 #4096
     fine_tuning:
       enable: False
       unfix_last_layer: 4
@@ -94,16 +94,16 @@ model:
 train_settings:
   MD_data_path: ./data/MD/dev_data/
   #data_path: /cluster/pixstor/xudong-lab/duolin/swiss-pos-512-v2_splitdata/train/
-  Atlas_data_repli_0_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_data_rep0
-  Atlas_data_repli_1_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_data_rep1
-  Atlas_data_repli_2_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_data_rep2
-  Atlas_test_repli_0_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_test_rep0
-  Atlas_test_repli_1_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_test_rep1
-  Atlas_test_repli_2_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_test_rep2
+  Atlas_data_repli_0_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_data_R1
+  Atlas_data_repli_1_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_data_R2
+  Atlas_data_repli_2_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_data_R3
+  Atlas_test_repli_0_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_test_R1
+  Atlas_test_repli_1_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_test_R2
+  Atlas_test_repli_2_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_test_R3
   num_steps: 5000 #10000000
   shuffle: True
   mixed_precision: "fp16" # no, fp16, bf16, fp8
-  batch_size: 64
+  batch_size: 8
   residue_batch_size: 2000
   num_workers: 1
   gradient_accumulation: 1
@@ -120,7 +120,7 @@ valid_settings:
   kinase_path: /cluster/pixstor/xudong-lab/duolin/simCLR/kinase_clustering/GPS5.0_homo_hasPK_with_kinasedomain.txt
   do_every: 50 # steps
   num_workers: 1
-  batch_size: 64
+  batch_size: 8
   eval_struct: 
       enable: False
       do_every: 1000
@@ -129,8 +129,7 @@ valid_settings:
 optimizer:
   name: sgd
   lr_seq: 0.01
-  lr_struct: 0.00001
-  lr_MD: 0.0001
+  lr_x: 0.0001
   weight_decouple: True
   weight_decay: 0.0005
   eps: 1e-16
@@ -140,7 +139,6 @@ optimizer:
   decay:
     warmup: 10
     min_lr_seq: 0
-    min_lr_struct: 0
-    min_lr_MD: 0
+    min_lr_x: 0
     gamma: 1
     first_cycle_steps: 80 #2000

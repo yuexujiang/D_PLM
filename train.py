@@ -31,7 +31,12 @@ def prepare_loss(simclr,graph,batch_tokens,plddt,criterion, loss,
     features_struct, residue_struct, features_seq, residue_seq = simclr(
                     graph=graph, batch_tokens=batch_tokens)
     
-    residue_struct, residue_seq, plddt_residue = residue_batch_sample(
+    if plddt == None:
+        residue_struct, residue_seq = residue_batch_sample(
+                    residue_struct, residue_seq, plddt,
+                    configs.train_settings.residue_batch_size, accelerator)
+    else:
+        residue_struct, residue_seq, plddt_residue = residue_batch_sample(
                     residue_struct, residue_seq, plddt,
                     configs.train_settings.residue_batch_size, accelerator)
     

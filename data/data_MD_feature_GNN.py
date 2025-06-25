@@ -11,7 +11,7 @@ from torch_geometric.data import Data
 
 def build_dccm_graph(dccm_matrix: np.ndarray, 
                      mi_matrix: np.ndarray, 
-                     rmsf: np.ndarray,
+                     rmsf: torch.Tensor,
                      top_k: int = 15) -> Data:
     """
     Build PyTorch Geometric graph from DCCM and MI matrices
@@ -46,6 +46,8 @@ def build_dccm_graph(dccm_matrix: np.ndarray,
             # Edge features: [DCCM_value, MI_value]
             edge_feat = [dccm_matrix[i, j], mi_matrix[i, j]]
             edge_features.append(edge_feat)
+
+            
     
     # Convert to tensors
     edge_index = torch.tensor(edge_list, dtype=torch.long).t().contiguous()
@@ -144,7 +146,7 @@ def prepare_replicate(configs, train_repli_path, test_repli_path):
     # Create DataLoader for each split
     temp = list(zip(*train_samples))
     rmsf_list, dccm_list, mi_list, seq_list, pid_list = [list(x) for x in temp]
-    train_dataset = ProteinDataset(rmsf_list, dccm_list, mi_list, seq_list, pid_list)
+    train_dataset = ProteinDataset(dccm_list, mi_list, rmsf_list, seq_list, pid_list)
     train_dataloader = DataLoader(
         train_dataset,
         batch_size=configs.train_settings.batch_size,
@@ -154,7 +156,7 @@ def prepare_replicate(configs, train_repli_path, test_repli_path):
     )
     temp = list(zip(*val_samples))
     rmsf_list, dccm_list, mi_list, seq_list, pid_list = [list(x) for x in temp]
-    val_dataset = ProteinDataset(rmsf_list, dccm_list, mi_list, seq_list, pid_list)
+    val_dataset = ProteinDataset(dccm_list, mi_list, rmsf_list, seq_list, pid_list)
     val_dataloader = DataLoader(
         val_dataset,
         batch_size=configs.train_settings.batch_size,
@@ -164,7 +166,7 @@ def prepare_replicate(configs, train_repli_path, test_repli_path):
     )
     temp = list(zip(*test_samples))
     rmsf_list, dccm_list, mi_list, seq_list, pid_list = [list(x) for x in temp]
-    test_dataset = ProteinDataset(rmsf_list, dccm_list, mi_list, seq_list, pid_list)
+    test_dataset = ProteinDataset(dccm_list, mi_list, rmsf_list, seq_list, pid_list)
     test_dataloader = DataLoader(
         test_dataset,
         batch_size=configs.train_settings.batch_size,
@@ -197,6 +199,17 @@ def prepare_samples(datapath, configs):
     for file_name in os.listdir(datapath):
         file_path = os.path.abspath(os.path.join(datapath, file_name))
         rmsf, dccm, mi, seq, pid = load_h5_file_v2(file_path)
+
+        rmsf = torch.tensor(rmsf)
+        chunk_size = 100
+        means = []
+        for i in range(0, rmsf.shape[1], chunk_size):
+            chunk = rmsf[:, i:i+chunk_size]  # shape: [512, <=100]
+            chunk_mean = chunk.mean(dim=1, keepdim=True)  # mean over columns
+            means.append(chunk_mean)
+        
+        # Concatenate means along the second dimension
+        rmsf = torch.cat(means, dim=1)  # shape: [512, num_chunks]
         samples.append((rmsf[:maxlen], dccm[:maxlen, :maxlen], mi[:maxlen, :maxlen], seq, pid))
     
     return samples

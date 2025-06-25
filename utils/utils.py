@@ -397,14 +397,11 @@ def load_optimizers(model_seq, model_x, logging, configs):
           )
     elif configs.optimizer.name.lower() == 'sgd':
         logging.info('use sgd optimizer')
-        if model_x is not None and configs.model.X_module=="structure":
-            optimizer_x = torch.optim.SGD(model_x.parameters(), lr=float(configs.optimizer.lr_struct),
+        if model_x is not None:
+            optimizer_x = torch.optim.SGD(model_x.parameters(), lr=float(configs.optimizer.lr_x),
                                            momentum=0.9, dampening=0,
                                            weight_decay=float(configs.optimizer.weight_decay))
-        if model_x is not None and configs.model.X_module=="MD":
-            optimizer_x = torch.optim.SGD(model_x.parameters(), lr=float(configs.optimizer.lr_MD),
-                                           momentum=0.9, dampening=0,
-                                           weight_decay=float(configs.optimizer.weight_decay))
+        
         if model_seq is not None:
            optimizer_seq = torch.optim.SGD(model_seq.parameters(), lr=float(configs.optimizer.lr_seq), momentum=0.9,
                                         dampening=0, weight_decay=float(configs.optimizer.weight_decay))
@@ -423,22 +420,13 @@ def prepare_optimizer(model_seq, model_x, logging, configs):
 
     logging.info("prepare the schedulers")
     # if configs.optimizer.name.lower() != 'sgd':
-    if model_x is not None and configs.model.X_module=="structure":
+    if model_x is not None:
       scheduler_x = CosineAnnealingWarmupRestarts(
         optimizer_x,
         first_cycle_steps=configs.optimizer.decay.first_cycle_steps,
         cycle_mult=1.0,
-        max_lr=configs.optimizer.lr_struct,
-        min_lr=configs.optimizer.decay.min_lr_struct,
-        warmup_steps=configs.optimizer.decay.warmup,
-        gamma=configs.optimizer.decay.gamma)
-    if model_x is not None and configs.model.X_module=="MD":
-      scheduler_x = CosineAnnealingWarmupRestarts(
-        optimizer_x,
-        first_cycle_steps=configs.optimizer.decay.first_cycle_steps,
-        cycle_mult=1.0,
-        max_lr=configs.optimizer.lr_MD,
-        min_lr=configs.optimizer.decay.min_lr_MD,
+        max_lr=configs.optimizer.lr_x,
+        min_lr=configs.optimizer.decay.min_lr_x,
         warmup_steps=configs.optimizer.decay.warmup,
         gamma=configs.optimizer.decay.gamma)
     if model_seq is not None:
