@@ -106,8 +106,8 @@ def load_configs(config, args=None):
 
     # Convert the necessary values to floats.
     tree_config.optimizer.lr_seq = float(tree_config.optimizer.lr_seq)
-    tree_config.optimizer.lr_struct = float(tree_config.optimizer.lr_struct)
-    tree_config.optimizer.decay.min_lr_struct = float(tree_config.optimizer.decay.min_lr_struct)
+    tree_config.optimizer.lr_x = float(tree_config.optimizer.lr_x)
+    tree_config.optimizer.decay.min_lr_x = float(tree_config.optimizer.decay.min_lr_x)
     tree_config.optimizer.decay.min_lr_seq = float(tree_config.optimizer.decay.min_lr_seq)
     tree_config.optimizer.weight_decay = float(tree_config.optimizer.weight_decay)
     tree_config.optimizer.eps = float(tree_config.optimizer.eps)

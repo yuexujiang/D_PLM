@@ -852,7 +852,7 @@ def evaluation_loop(simclr, val_loader, labels, labels_residue, batch_converter,
                 accelerator, configs)
             """
             loss_val_sum, graph_loss, residue_loss, MLM_loss,logits, labels, logits_residue, labels_residue = prepare_loss(
-                simclr,graph,batch_tokens,batch['plddt'],criterion,loss_val_sum,accelerator, configs,
+                simclr,graph,batch_tokens,None,criterion,loss_val_sum,accelerator, configs,
                 masked_lm_data_collator
                 )
             graph_loss_sum += graph_loss
