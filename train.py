@@ -1066,7 +1066,7 @@ def main(args, dict_configs, config_file_path):
     
     start_step = 0
     if configs.resume.resume:
-        if configs.model.X_module == 'MD':
+        if configs.model.X_module == 'MD' or configs.model.X_module=='DCCM_GNN':
             simclr,start_step, best_score = load_checkpoints_md(simclr, configs, 
                             optimizer_seq,optimizer_x,scheduler_seq,scheduler_x,
                             logging,resume_path=configs.resume.resume_path,restart_optimizer=configs.resume.restart_optimizer)
