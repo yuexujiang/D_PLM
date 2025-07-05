@@ -9,6 +9,7 @@ import gvp.models
 from torch_geometric.nn import global_mean_pool, global_max_pool, global_add_pool
 from torch_geometric.nn import MessagePassing
 import numpy as np
+from torch_scatter import scatter_mean
 
 
 def set_requires_grad(model, val):
@@ -310,6 +311,171 @@ class VIVIT(nn.Module):  # embedding table is fixed
             return graph_feature, x
         else:
             return graph_feature
+
+class Geom2vec_tematt(nn.Module):  
+    def __init__(self, 
+                 configs,
+                 input_dim=512, 
+                 hidden_dim=128, 
+                 output_dim=32,
+                 temporal_dim=100,
+                 residue_inner_dim=4096,
+                 residue_out_dim=256,
+                 protein_out_dim=256,
+                 residue_num_projector=2,
+                 protein_inner_dim=4096, protein_num_projector=2):
+        """
+        unfix_last_layer: the number of layers that can be fine-tuned
+        """
+        super(Geom2vec, self).__init__()
+        # self.image_processor = VivitImageProcessor.from_pretrained(vivit_pretrain)
+        # self.model = VivitModel.from_pretrained(vivit_pretrain, cache_dir=configs.HF_cache_path)
+
+        # First conv: maintain temporal resolution
+        self.conv1 = nn.Conv1d(
+            in_channels=input_dim,
+            out_channels=hidden_dim,
+            kernel_size=7,
+            stride=1,
+            padding=3
+        )
+        
+        # Progressive pooling: 1000 -> 500
+        self.pool1 = nn.AvgPool1d(kernel_size=2, stride=2)
+        
+        # Second conv: still maintain some resolution
+        self.conv2 = nn.Conv1d(
+            in_channels=hidden_dim,
+            out_channels=output_dim,
+            kernel_size=5,
+            stride=1,
+            padding=2
+        )
+        
+        # Final pooling: 500 -> 100
+        self.pool2 = nn.AvgPool1d(kernel_size=5, stride=5)
+        
+        self.relu = nn.ReLU()
+        self.batch_norm1 = nn.BatchNorm1d(hidden_dim)
+        self.batch_norm2 = nn.BatchNorm1d(output_dim)
+        self.dropout = nn.Dropout(0.1)
+        
+        proj_dim= temporal_dim * output_dim
+        self.projectors_protein = MoBYMLP(in_dim=proj_dim, inner_dim=protein_inner_dim, out_dim=protein_out_dim,
+                                          num_layers=protein_num_projector)
+
+        self.projectors_residue = MoBYMLP(in_dim=proj_dim, inner_dim=residue_inner_dim, out_dim=residue_out_dim,
+                                          num_layers=residue_num_projector)
+        
+
+        if hasattr(configs.model.MD_encoder, "fine_tuning") and not configs.model.MD_encoder.fine_tuning.enable:
+            for name, param in self.model.named_parameters():
+                param.requires_grad = False
+
+        if hasattr(configs.model.Geom2vec_encoder, "fine_tuning_projct") and not configs.model.Geom2vec_encoder.fine_tuning_projct.enable:
+            for name, param in self.projectors_protein.named_parameters():
+                param.requires_grad = False
+            
+            for name, param in self.projectors_residue.named_parameters():
+                param.requires_grad = False
+
+    def forward(self, graph, return_logits=False, return_embedding=False): #res_rep (flat) [sum_n_residue, T, 512]
+        #outputs = self.model(x)
+        # print("OKOKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK")
+        if return_logits:
+            # prediction_scores = outputs["logits"]
+            # return prediction_scores
+            print("print something")
+        else:
+            res_rep = graph[0]
+            batch_idx = graph[1]
+            x = res_rep.transpose(1, 2)  # [sum_n_residue, dim, T]
+            
+            # First block: feature extraction without downsampling
+            x = self.conv1(x)  # [sum_n_residue, dim, T]
+            x = self.batch_norm1(x)
+            x = self.relu(x)
+            x = self.dropout(x)
+            x = self.pool1(x)  # [sum_n_residue, dim, T]
+            
+            # Second block: more feature extraction
+            x = self.conv2(x)  # [sum_n_residue, out_dim, T]
+            x = self.batch_norm2(x)
+            x = self.relu(x)
+            x = self.pool2(x)  # [sum_n_residue, out_dim, tem_dim]
+            
+            res_rep = x.transpose(1, 2)  # [sum_n_residue, tem_dim, out_dim]
+
+            # Step 3: Flatten [10, 64] → [640]
+            res_rep = res_rep.view(res_rep.size(0), -1)  # [sum_n_residue, tem_dim * out_dim]
+            
+            # Step 4: Graph-style pooling to protein level: [B, 640]
+            protein_level_rep = scatter_mean(res_rep, batch_idx, dim=0)  # [B, 640]
+            # last_hidden_states = outputs.last_hidden_state # [batch, 3137, 768]
+            # cls_representation = last_hidden_states[:, 0, :] # [batch, 768]
+            graph_feature = self.projectors_protein(protein_level_rep)
+            residue_feature = self.projectors_residue(res_rep)
+
+        if return_embedding:
+            return graph_feature, residue_feature, protein_level_rep, res_rep
+        else:
+            return graph_feature, residue_feature
+
+class Geom2vec(nn.Module):  
+    def __init__(self, 
+                 configs,
+                 residue_inner_dim=4096,
+                 residue_out_dim=256,
+                 protein_out_dim=256,
+                 residue_num_projector=2,
+                 protein_inner_dim=4096, protein_num_projector=2):
+        """
+        unfix_last_layer: the number of layers that can be fine-tuned
+        """
+        super(Geom2vec, self).__init__()
+        # self.image_processor = VivitImageProcessor.from_pretrained(vivit_pretrain)
+        # self.model = VivitModel.from_pretrained(vivit_pretrain, cache_dir=configs.HF_cache_path)
+
+        dim_res = 512
+        dim_pro = 1024
+        
+        self.projectors_protein = MoBYMLP(in_dim=dim_pro, inner_dim=protein_inner_dim, out_dim=protein_out_dim,
+                                          num_layers=protein_num_projector)
+
+        self.projectors_residue = MoBYMLP(in_dim=dim_res, inner_dim=residue_inner_dim, out_dim=residue_out_dim,
+                                          num_layers=residue_num_projector)
+        
+
+        # if hasattr(configs.model.MD_encoder, "fine_tuning") and not configs.model.MD_encoder.fine_tuning.enable:
+        #     for name, param in self.model.named_parameters():
+        #         param.requires_grad = False
+
+        if hasattr(configs.model.Geom2vec_encoder, "fine_tuning_projct") and not configs.model.Geom2vec_encoder.fine_tuning_projct.enable:
+            for name, param in self.projectors_protein.named_parameters():
+                param.requires_grad = False
+            
+            for name, param in self.projectors_residue.named_parameters():
+                param.requires_grad = False
+
+    def forward(self, graph, return_logits=False, return_embedding=False): #prot_vec [batch_size, 1024], res_rep (flat) [sum_n_residue, 512]
+        #outputs = self.model(x)
+        # print("OKOKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK")
+        if return_logits:
+            # prediction_scores = outputs["logits"]
+            # return prediction_scores
+            print("print something")
+        else:
+            res_rep = graph[0]
+            prot_vec = graph[1]
+            # last_hidden_states = outputs.last_hidden_state # [batch, 3137, 768]
+            # cls_representation = last_hidden_states[:, 0, :] # [batch, 768]
+            graph_feature = self.projectors_protein(prot_vec)
+            residue_feature = self.projectors_residue(res_rep)
+
+        if return_embedding:
+            return graph_feature, residue_feature, prot_vec, res_rep
+        else:
+            return graph_feature, residue_feature
 
 class EdgeGNNLayer(MessagePassing):
     """
@@ -733,6 +899,10 @@ class SimCLR(nn.Module):
             return self.model_x(graph)
         elif mode == 'DCCM_GNN':
             return self.model_x(graph, return_embedding=return_embedding)
+        elif mode == 'Geom2vec':
+            return self.model_x(graph[0], graph[1]) # graph = [res_rep, prot_vec]
+        elif mode == 'Geom2vec_tematt':
+            return self.model_x(graph[0], graph[1]) # graph = [res_rep, batch_ind]
         else:
             if self.configs.model.X_module == "structure":
                 features_seq, residue_seq = self.model_seq(batch_tokens)
@@ -745,6 +915,14 @@ class SimCLR(nn.Module):
             if self.configs.model.X_module == "DCCM_GNN":
                 features_seq, residue_seq = self.model_seq(batch_tokens)
                 protein_MD_feature, residue_MD_feature = self.model_x(graph)
+                return protein_MD_feature, residue_MD_feature, features_seq, residue_seq
+            if self.configs.model.X_module == "Geom2vec":
+                features_seq, residue_seq = self.model_seq(batch_tokens)
+                protein_MD_feature, residue_MD_feature = self.model_x(graph[0],graph[1]) # graph = [res_rep, prot_vec]
+                return protein_MD_feature, residue_MD_feature, features_seq, residue_seq
+            if self.configs.model.X_module == "Geom2vec_tematt":
+                features_seq, residue_seq = self.model_seq(batch_tokens)
+                protein_MD_feature, residue_MD_feature = self.model_x(graph[0],graph[1]) # graph = [res_rep, batch_ind]
                 return protein_MD_feature, residue_MD_feature, features_seq, residue_seq
         
     # def forward_structure(self, graph):
@@ -762,6 +940,15 @@ class SimCLR(nn.Module):
         if self.configs.model.X_module == "MD":
             features_MD = self.model_x(graph)
             return features_MD
+        if self.configs.model.X_module == "DCCM_GNN":
+            protein_MD_feature, residue_MD_feature = self.model_x(graph)
+            return protein_MD_feature, residue_MD_feature
+        if self.configs.model.X_module == "Geom2vec":
+            protein_MD_feature, residue_MD_feature = self.model_x(graph[0],graph[1]) # graph = [res_rep, prot_vec]
+            return protein_MD_feature, residue_MD_feature
+        if self.configs.model.X_module == "Geom2vec_tematt":
+            protein_MD_feature, residue_MD_feature = self.model_x(graph[0],graph[1]) # graph = [res_rep, batch_ind]
+            return protein_MD_feature, residue_MD_feature
 
 
 class GVP_CLASSIFICATION(nn.Module):
@@ -1305,8 +1492,6 @@ def prepare_gvppretrain_model(logging,configs,accelerator):
 
 
 def prepare_models(logging, configs, accelerator):
-    
-    
     # Use ESM2 for sequence
     model_seq = ESM2(configs.model.esm_encoder.model_name,
                      accelerator=accelerator,
@@ -1351,6 +1536,38 @@ def prepare_models(logging, configs, accelerator):
         if accelerator.is_main_process:
           print_trainable_parameters(model_seq, logging)
           print_trainable_parameters(model_DCCM_GNN, logging)
+    elif configs.model.X_module == 'Geom2vec':
+        model_Geom2vec = Geom2vec(configs=configs,
+                     residue_inner_dim=configs.model.Geom2vec_encoder.residue_inner_dim,
+                     residue_out_dim=configs.model.residue_out_dim,
+                     protein_out_dim=configs.model.protein_out_dim,
+                     residue_num_projector=configs.model.residue_num_projector,
+                     protein_inner_dim=configs.model.Geom2vec_encoderr.protein_inner_dim,
+                     protein_num_projector=configs.model.protein_num_projector)
+        
+        if accelerator.is_main_process:
+          print_trainable_parameters(model_seq, logging)
+          print_trainable_parameters(model_MD, logging)
+        
+        simclr = SimCLR(model_seq, model_Geom2vec, configs=configs)
+    elif configs.model.X_module == 'Geom2vec_tematt':
+        model_Geom2vec_tematt = Geom2vec_tematt(configs=configs,
+                                                input_dim=configs.model.Geom2vec_tematt_encoder.cnn_input_dim, 
+                                                hidden_dim=configs.model.Geom2vec_tematt_encoder.cnn_hidden_dim, 
+                                                output_dim=configs.model.Geom2vec_tematt_encoder.cnn_output_dim,
+                                                temporal_dim=configs.model.Geom2vec_tematt_encoder.temporal_dim,
+                     residue_inner_dim=configs.model.Geom2vec_tematt_encoder.residue_inner_dim,
+                     residue_out_dim=configs.model.residue_out_dim,
+                     protein_out_dim=configs.model.protein_out_dim,
+                     residue_num_projector=configs.model.residue_num_projector,
+                     protein_inner_dim=configs.model.Geom2vec_tematt_encoderr.protein_inner_dim,
+                     protein_num_projector=configs.model.protein_num_projector)
+        
+        if accelerator.is_main_process:
+          print_trainable_parameters(model_seq, logging)
+          print_trainable_parameters(model_MD, logging)
+        
+        simclr = SimCLR(model_seq, model_Geom2vec_tematt, configs=configs)
     elif configs.model.X_module == "structure":
         model_struct = GVPEncoder(configs=configs, residue_inner_dim=configs.model.struct_encoder.residue_inner_dim,
                               residue_out_dim=configs.model.residue_out_dim,
