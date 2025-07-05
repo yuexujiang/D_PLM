@@ -327,7 +327,7 @@ class Geom2vec_tematt(nn.Module):
         """
         unfix_last_layer: the number of layers that can be fine-tuned
         """
-        super(Geom2vec, self).__init__()
+        super(Geom2vec_tematt, self).__init__()
         # self.image_processor = VivitImageProcessor.from_pretrained(vivit_pretrain)
         # self.model = VivitModel.from_pretrained(vivit_pretrain, cache_dir=configs.HF_cache_path)
 
@@ -341,7 +341,7 @@ class Geom2vec_tematt(nn.Module):
         )
         
         # Progressive pooling: 1000 -> 500
-        self.pool1 = nn.AvgPool1d(kernel_size=2, stride=2)
+        # self.pool1 = nn.AvgPool1d(kernel_size=2, stride=2)
         
         # Second conv: still maintain some resolution
         self.conv2 = nn.Conv1d(
@@ -353,7 +353,7 @@ class Geom2vec_tematt(nn.Module):
         )
         
         # Final pooling: 500 -> 100
-        self.pool2 = nn.AvgPool1d(kernel_size=5, stride=5)
+        # self.pool2 = nn.AvgPool1d(kernel_size=5, stride=5)
         
         self.relu = nn.ReLU()
         self.batch_norm1 = nn.BatchNorm1d(hidden_dim)
@@ -368,11 +368,13 @@ class Geom2vec_tematt(nn.Module):
                                           num_layers=residue_num_projector)
         
 
-        if hasattr(configs.model.MD_encoder, "fine_tuning") and not configs.model.MD_encoder.fine_tuning.enable:
-            for name, param in self.model.named_parameters():
+        if hasattr(configs.model.Geom2vec_tematt_encoder, "fine_tuning") and not configs.model.Geom2vec_tematt_encoder.fine_tuning.enable:
+            for name, param in self.conv1.named_parameters():
+                param.requires_grad = False
+            for name, param in self.conv2.named_parameters():
                 param.requires_grad = False
 
-        if hasattr(configs.model.Geom2vec_encoder, "fine_tuning_projct") and not configs.model.Geom2vec_encoder.fine_tuning_projct.enable:
+        if hasattr(configs.model.Geom2vec_tematt_encoder, "fine_tuning_projct") and not configs.model.Geom2vec_tematt_encoder.fine_tuning_projct.enable:
             for name, param in self.projectors_protein.named_parameters():
                 param.requires_grad = False
             
@@ -396,13 +398,13 @@ class Geom2vec_tematt(nn.Module):
             x = self.batch_norm1(x)
             x = self.relu(x)
             x = self.dropout(x)
-            x = self.pool1(x)  # [sum_n_residue, dim, T]
+            # x = self.pool1(x)  # [sum_n_residue, dim, T]
             
             # Second block: more feature extraction
             x = self.conv2(x)  # [sum_n_residue, out_dim, T]
             x = self.batch_norm2(x)
             x = self.relu(x)
-            x = self.pool2(x)  # [sum_n_residue, out_dim, tem_dim]
+            # x = self.pool2(x)  # [sum_n_residue, out_dim, tem_dim]
             
             res_rep = x.transpose(1, 2)  # [sum_n_residue, tem_dim, out_dim]
 
@@ -1560,12 +1562,12 @@ def prepare_models(logging, configs, accelerator):
                      residue_out_dim=configs.model.residue_out_dim,
                      protein_out_dim=configs.model.protein_out_dim,
                      residue_num_projector=configs.model.residue_num_projector,
-                     protein_inner_dim=configs.model.Geom2vec_tematt_encoderr.protein_inner_dim,
+                     protein_inner_dim=configs.model.Geom2vec_tematt_encoder.protein_inner_dim,
                      protein_num_projector=configs.model.protein_num_projector)
         
         if accelerator.is_main_process:
           print_trainable_parameters(model_seq, logging)
-          print_trainable_parameters(model_MD, logging)
+          print_trainable_parameters(model_Geom2vec_tematt, logging)
         
         simclr = SimCLR(model_seq, model_Geom2vec_tematt, configs=configs)
     elif configs.model.X_module == "structure":

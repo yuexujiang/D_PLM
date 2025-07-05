@@ -32,14 +32,14 @@ model:
     fine_tuning_projct:
          enable: True
   Geom2vec_tematt_encoder:
-    cnn_input_dim: 512
+    cnn_input_dim: 512 #fixed, don't change, it's due to geom2vec
     cnn_hidden_dim: 64
     cnn_output_dim: 32
-    temporal_dim: 100
-    residue_inner_dim: 256
-    protein_inner_dim: 512
+    temporal_dim: 100 #fixed, due to conv pooling
+    residue_inner_dim: 128
+    protein_inner_dim: 256
     fine_tuning:
-         enable: False
+         enable: True
     fine_tuning_projct:
          enable: True
   DCCM_GNN_encoder:

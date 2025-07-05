@@ -28,6 +28,8 @@ def bin_average_functional(tensor, n_bins=300):
     tensor: shape [sum_n_residue, 10001, 512]
     Returns: shape [sum_n_residue, n_bins, 512]
     """
+    tensor = tensor.cpu()  # Move to CPU to save GPU memory
+
     batch_size, seq_len, hidden_dim = tensor.shape
     
     # Use adaptive average pooling
@@ -63,14 +65,14 @@ def custom_collate(batch):
     return batched_data
 
 def prepare_replicate(configs, train_repli_path, test_repli_path):
-    samples = prepare_samples(train_repli_path)
+    samples = prepare_samples(train_repli_path, configs)
     total_samples = len(samples)
     val_size = int(total_samples * 0.1)
     test_size = int(total_samples * 0.1)
     train_size = total_samples - val_size - test_size
     train_samples, val_samples, test_samples = random_split(samples, [train_size, val_size, test_size])
 
-    samples_hard = prepare_samples(test_repli_path)
+    samples_hard = prepare_samples(test_repli_path, configs)
     hard_num = len(samples_hard)
     val_size = int(hard_num * 0.5)
     test_size = hard_num - val_size
@@ -115,7 +117,12 @@ def prepare_dataloaders(configs):
   
     return train_dataloader, val_dataloader, test_dataloader
 
-
+def chunk_bin(input_tensor, chunk_size=100, bin_number=100):
+    outputs = []
+    for chunk in torch.split(input_tensor, chunk_size, dim=0):  # Process 1000 residues at a time
+        chunk = bin_average_functional(chunk, n_bins=bin_number)
+        outputs.append(chunk)
+    return torch.cat(outputs, dim=0)
 
 def prepare_samples(datapath, configs):
     maxlen = configs.model.esm_encoder.max_length
@@ -126,16 +133,17 @@ def prepare_samples(datapath, configs):
             traj_rep = torch.load(file_path) # [T, M, 4, D]
             traj_rep = traj_rep.permute(1, 0, 2, 3) #[M, T, 4, D]
             traj_rep = traj_rep.reshape(traj_rep.shape[0], traj_rep.shape[1], -1)  # → [M, T, 4*D]
-            bin_res_rep = bin_average_functional(traj_rep, n_bins=1000) #[M, 1000, dim]
+            # bin_res_rep = bin_average_functional(traj_rep, n_bins=100) #[M, 100, dim]
+            bin_res_rep = chunk_bin(traj_rep, chunk_size=100, bin_number=100) #[M, 100, dim]
 
             basename = os.path.basename(file_name)
             without_extension=os.path.splitext(basename)[0]
-            h5_filename = os.path.join(datapath, without_extension, f".h5")
+            h5_filename = os.path.join(datapath, f"{without_extension}.h5")
             geom2vec, seq, pid = load_h5(h5_filename)
         else:
             continue
         # prot_rep = geom2vec.mean
-        samples.append((pid, seq, bin_res_rep)) #bin_res_rep [n_residue, 1000, dim]
+        samples.append((pid, seq, bin_res_rep[:maxlen])) #bin_res_rep [n_residue, 1000, dim]
     
     return samples
 

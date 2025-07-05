@@ -247,7 +247,7 @@ sbatch --export=config_path=$config_path,result_path=$result_path, \
      run_yjm85.sh
      
      
-     
+########################     
      
 task="data_0"
 folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
@@ -339,7 +339,7 @@ sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_nu
      -J ${task} \
      data_process.pbs
      
- 
+#########################
 
 task="test_0"
 folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
@@ -431,5 +431,11 @@ sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_nu
      -J ${task} \
      data_process.pbs
      
- 
+#####################
+task="geom2vec_tematt"
+config_path='./configs_hell/gvp_v2/config_geom2vec_tematt.yaml'
+result_path='./results/geom2vec_tematt/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
      
