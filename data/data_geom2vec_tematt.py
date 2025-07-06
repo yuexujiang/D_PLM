@@ -14,12 +14,22 @@ import argparse
 
 class ProteinMDDataset(Dataset):
     def __init__(self, samples, configs,mode="train"):
-        self.original_samples = samples
+        # self.original_samples = samples
+        self.file_pairs = samples  # list of (traj_path, h5_path)
+        self.configs = configs
+        self.maxlen = configs.model.esm_encoder.max_length
     def __len__(self):
-           return len(self.original_samples)
+           return len(self.file_pairs)
     def __getitem__(self, idx):
-        pid, seq, res_rep = self.original_samples[idx]
-        return pid, seq, res_rep #res_rep [n_residue, T, 512]
+        # pid, seq, res_rep = self.original_samples[idx]
+        traj_path, h5_path = self.file_pairs[idx]
+        traj_rep = torch.load(traj_path) # [T, M, 4, D]
+        traj_rep = traj_rep.permute(1, 0, 2, 3) #[M, T, 4, D]
+        traj_rep = traj_rep.reshape(traj_rep.shape[0], traj_rep.shape[1], -1)  # → [M, T, 4*D]
+        # bin_res_rep = bin_average_functional(traj_rep, n_bins=100) #[M, 100, dim]
+        bin_res_rep = chunk_bin(traj_rep, chunk_size=100, bin_number=100) #[M, 100, dim]
+        geom2vec, seq, pid = load_h5(h5_path)
+        return pid, seq, bin_res_rep[:self.maxlen] #res_rep [n_residue, T, 512]
 
 import torch.nn.functional as F
 
@@ -130,20 +140,20 @@ def prepare_samples(datapath, configs):
     for file_name in os.listdir(datapath):
         if file_name.endswith(".pt"):
             file_path = os.path.abspath(os.path.join(datapath, file_name))
-            traj_rep = torch.load(file_path) # [T, M, 4, D]
-            traj_rep = traj_rep.permute(1, 0, 2, 3) #[M, T, 4, D]
-            traj_rep = traj_rep.reshape(traj_rep.shape[0], traj_rep.shape[1], -1)  # → [M, T, 4*D]
-            # bin_res_rep = bin_average_functional(traj_rep, n_bins=100) #[M, 100, dim]
-            bin_res_rep = chunk_bin(traj_rep, chunk_size=100, bin_number=100) #[M, 100, dim]
-
-            basename = os.path.basename(file_name)
-            without_extension=os.path.splitext(basename)[0]
+            # traj_rep = torch.load(file_path) # [T, M, 4, D]
+            # traj_rep = traj_rep.permute(1, 0, 2, 3) #[M, T, 4, D]
+            # traj_rep = traj_rep.reshape(traj_rep.shape[0], traj_rep.shape[1], -1)  # → [M, T, 4*D]
+            # # bin_res_rep = bin_average_functional(traj_rep, n_bins=100) #[M, 100, dim]
+            # bin_res_rep = chunk_bin(traj_rep, chunk_size=100, bin_number=100) #[M, 100, dim]
+            
+            without_extension=os.path.splitext(file_name)[0]
             h5_filename = os.path.join(datapath, f"{without_extension}.h5")
-            geom2vec, seq, pid = load_h5(h5_filename)
+            # geom2vec, seq, pid = load_h5(h5_filename)
         else:
             continue
         # prot_rep = geom2vec.mean
-        samples.append((pid, seq, bin_res_rep[:maxlen])) #bin_res_rep [n_residue, 1000, dim]
+        # samples.append((pid, seq, bin_res_rep[:maxlen])) #bin_res_rep [n_residue, 1000, dim]
+        samples.append((file_path, h5_filename))
     
     return samples
 

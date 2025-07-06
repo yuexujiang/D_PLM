@@ -977,9 +977,15 @@ def evaluation_loop(simclr, val_loader, labels, labels_residue, batch_converter,
         batch_seq = [(batch['pid'][i], str(batch['seq'][i])) for i in range(len(batch['seq']))]  # batch['seq']
         bsz = len(batch)
         batch_labels, batch_strs, batch_tokens = batch_converter(batch_seq)
-        graph = batch["graph"]
+        if configs.model.X_module=="Geom2vec_tematt":
+            res_rep = batch['res_rep']
+            batch_idx = batch['batch_idx']
+            graph = [res_rep.to(accelerator.device), batch_idx.to(accelerator.device)]
+        else:
+            graph = batch["graph"]
+            graph = graph.to(accelerator.device)
         batch_tokens = batch_tokens.to(accelerator.device)
-        graph = graph.to(accelerator.device)
+        
 
         simclr.eval()
         with torch.inference_mode():
@@ -1269,7 +1275,7 @@ def main(args, dict_configs, config_file_path):
     elif configs.model.X_module == 'Geom2vec_tematt':
         from data.data_geom2vec_tematt import prepare_dataloaders
         train_loader, val_loader, test_loader = prepare_dataloaders(configs)
-        train_dataloader, val_dataloader, test_dataloader=accelerator.prepare(train_dataloader, val_dataloader, test_dataloader)
+        train_loader, val_loader, test_loader=accelerator.prepare(train_loader, val_loader, test_loader)
     elif configs.model.X_module == 'structure':
         if hasattr(configs.model.struct_encoder,"version") and configs.model.struct_encoder.version == 'v2':
             from data.data_v2 import prepare_dataloaders as prepare_dataloaders_v2

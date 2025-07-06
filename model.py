@@ -409,7 +409,7 @@ class Geom2vec_tematt(nn.Module):
             res_rep = x.transpose(1, 2)  # [sum_n_residue, tem_dim, out_dim]
 
             # Step 3: Flatten [10, 64] → [640]
-            res_rep = res_rep.view(res_rep.size(0), -1)  # [sum_n_residue, tem_dim * out_dim]
+            res_rep = res_rep.reshape(res_rep.size(0), -1)  # [sum_n_residue, tem_dim * out_dim]
             
             # Step 4: Graph-style pooling to protein level: [B, 640]
             protein_level_rep = scatter_mean(res_rep, batch_idx, dim=0)  # [B, 640]
@@ -920,11 +920,11 @@ class SimCLR(nn.Module):
                 return protein_MD_feature, residue_MD_feature, features_seq, residue_seq
             if self.configs.model.X_module == "Geom2vec":
                 features_seq, residue_seq = self.model_seq(batch_tokens)
-                protein_MD_feature, residue_MD_feature = self.model_x(graph[0],graph[1]) # graph = [res_rep, prot_vec]
+                protein_MD_feature, residue_MD_feature = self.model_x(graph) # graph = [res_rep, prot_vec]
                 return protein_MD_feature, residue_MD_feature, features_seq, residue_seq
             if self.configs.model.X_module == "Geom2vec_tematt":
                 features_seq, residue_seq = self.model_seq(batch_tokens)
-                protein_MD_feature, residue_MD_feature = self.model_x(graph[0],graph[1]) # graph = [res_rep, batch_ind]
+                protein_MD_feature, residue_MD_feature = self.model_x(graph) # graph = [res_rep, batch_ind]
                 return protein_MD_feature, residue_MD_feature, features_seq, residue_seq
         
     # def forward_structure(self, graph):
