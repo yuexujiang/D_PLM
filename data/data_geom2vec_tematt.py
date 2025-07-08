@@ -74,7 +74,7 @@ def custom_collate(batch):
     # return pid, seq, contacts
     return batched_data
 
-def prepare_replicate(configs, train_repli_path, test_repli_path):
+def prepare_replicate(configs, train_repli_path, test_repli_path, Atlas_v2add_path):
     samples = prepare_samples(train_repli_path, configs)
     total_samples = len(samples)
     val_size = int(total_samples * 0.1)
@@ -90,6 +90,10 @@ def prepare_replicate(configs, train_repli_path, test_repli_path):
 
     val_samples = val_samples + val_hard
     test_samples = test_samples + test_hard
+
+    v2add_samples = prepare_samples(Atlas_v2add_path, configs)
+    train_samples = train_samples + v2add_samples
+    
     print(f"train samples: {len(train_samples)}, val samples: {len(val_samples)}, test samples: {len(test_samples)}")
     # Create DataLoader for each split
     train_dataset = ProteinMDDataset(train_samples, configs=configs, mode="train")
@@ -123,7 +127,8 @@ def prepare_replicate(configs, train_repli_path, test_repli_path):
 def prepare_dataloaders(configs):
     train_dataloader, val_dataloader, test_dataloader = prepare_replicate(configs, 
                                                                           configs.train_settings.Atlas_data_path, 
-                                                                          configs.train_settings.Atlas_test_path)
+                                                                          configs.train_settings.Atlas_test_path,
+                                                                          configs.train_settings.Atlas_v2add_path)
   
     return train_dataloader, val_dataloader, test_dataloader
 

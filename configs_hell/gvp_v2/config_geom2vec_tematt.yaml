@@ -114,6 +114,7 @@ train_settings:
   #data_path: /cluster/pixstor/xudong-lab/duolin/swiss-pos-512-v2_splitdata/train/
   Atlas_data_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_data
   Atlas_test_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_test
+  Atlas_v2add_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_v2add
   num_steps: 2000 #10000000
   shuffle: True
   mixed_precision: "fp16" # no, fp16, bf16, fp8

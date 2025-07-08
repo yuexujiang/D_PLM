@@ -342,94 +342,50 @@ sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_nu
 #########################
 
 task="test_0"
-folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
 num=0
-split_num=10
-outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_test'
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_v2add'
 sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
      -J ${task} \
      data_process.pbs
      
 task="test_1"
-folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
 num=1
-split_num=10
-outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_test'
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_v2add'
 sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
      -J ${task} \
      data_process.pbs
      
 task="test_2"
-folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
 num=2
-split_num=10
-outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_test'
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_v2add'
 sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
      -J ${task} \
      data_process.pbs
      
 task="test_3"
-folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
 num=3
-split_num=10
-outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_test'
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_v2add'
 sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
      -J ${task} \
      data_process.pbs
      
 task="test_4"
-folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
 num=4
-split_num=10
-outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_test'
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_v2add'
 sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
      -J ${task} \
      data_process.pbs  
-     
-task="test_5"
-folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
-num=5
-split_num=10
-outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_test'
-sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
-     -J ${task} \
-     data_process.pbs
 
-task="test_6"
-folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
-num=6
-split_num=10
-outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_test'
-sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
-     -J ${task} \
-     data_process.pbs
-     
-task="test_7"
-folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
-num=7
-split_num=10
-outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_test'
-sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
-     -J ${task} \
-     data_process.pbs
-     
-task="test_8"
-folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
-num=8
-split_num=10
-outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_test'
-sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
-     -J ${task} \
-     data_process.pbs
-     
-task="test_9"
-folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
-num=9
-split_num=10
-outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_test'
-sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
-     -J ${task} \
-     data_process.pbs
      
 #####################
 task="geom2vec_tematt"
@@ -439,3 +395,14 @@ sbatch --export=config_path=$config_path,result_path=$result_path, \
      -J ${task} \
      run_yjm85.sh
      
+#####################
+#need to submit in sbatch, need long time
+model_location=/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/DCCM_GNN_bigger/checkpoints/checkpoint_0001000.pth
+config_path=/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/DCCM_GNN_bigger/config_DCCM_GNN.yaml
+scoring_strategy=wt-mt-RLA #"mask-marginals
+python -m ESM-1v\ data.predict_splm \
+       --model-location $model_location \
+       --config-path $config_path \
+       --scoring-strategy $scoring_strategy
+
+#####################################################
