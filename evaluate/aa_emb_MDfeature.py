@@ -20,6 +20,7 @@ from sklearn.metrics import pairwise_distances
 import os
 import h5py
 import pandas as pd
+import matplotlib.pyplot as plt
 
 
 def load_checkpoints(model,checkpoint_path):
@@ -51,7 +52,7 @@ def load_checkpoints(model,checkpoint_path):
 
 
 def load_model(args):
-    if args.model_type=="s-plm":
+    if args.model_type=="d-plm":
         with open(args.config_path) as file:
             config_file = yaml.full_load(file)
             configs = load_configs(config_file, args=None)
@@ -123,38 +124,53 @@ def load_h5_file_v2(file_path):
 
 def flatten_upper(mat):
     return mat[np.triu_indices_from(mat, k=1)]
-if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(description='PyTorch SimCLR')
-    parser.add_argument("--model-location", type=str, help="xx", default='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/geom2vec_tematt/checkpoints/checkpoint_0002000.pth')
-    parser.add_argument("--config-path", type=str, default='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/geom2vec_tematt/config_geom2vec_tematt.yaml', help="xx")
-    parser.add_argument("--model-type", default='s-plm', type=str, help="xx")
-    parser.add_argument("--sequence", type=str, help="xx")
-    args = parser.parse_args()
+def plot_and_fit(x, y, xlabel, ylabel, correlation, output_path, figure_name):
+    x = np.array(x)
+    y = np.array(y)
     
-    args.model,args.alphabet = load_model(args)
+    # Fit a linear regression line: y = m*x + b
+    m, b = np.polyfit(x, y, 1)
+    fit_line = m * x + b
+    
+    # Plot
+    plt.figure(figsize=(6, 4))
+    plt.scatter(x, y, color='blue', label='Data Points')
+    plt.plot(x, fit_line, color='red', label=f'Fit Line: y = {m:.2f}x + {b:.2f}')
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.title(f"Spearman cor: {correlation}")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    # plt.show()
+    plt.savefig(os.path.join(output_path, f"{figure_name}.png"))
 
+def gogogo(args):
+    #
+    args.model,args.alphabet = load_model(args)
+    #
     datapath = '/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_test/'
     datapath_MDfeature = '/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_test/'
-
     processed_list=[]
     rep_norm_list=[]
     rmsf_list=[]
     rep_dis_list=[]
     dccm_list=[]
     for file_name in os.listdir(datapath):
+        print(f"processing...{file_name}")
         pid="_".join(file_name.split('_')[:2])
         if pid in processed_list:
             continue
         pdb_file = os.path.join("/cluster/pixstor/xudong-lab/yuexu/D_PLM/analysis/", f"{pid}_analysis", f"{pid}.pdb")
         args.sequence = str(pdb2seq(pdb_file))
-        
+        #
         seq_emb = main(args) #[seq_l+2, 1280]
         seq_emb = seq_emb[1:-1]
-        print(seq_emb.shape)
-        distance_matrix = pairwise_distances(seq_emb, metric="euclidean")  # or cosine
-        residue_norms = np.linalg.norm(seq_emb, axis=1)
-
+        # print(seq_emb.shape)
+        distance_matrix = pairwise_distances(seq_emb.cpu(), metric="euclidean")  # or cosine
+        residue_norms = np.linalg.norm(seq_emb.cpu(), axis=1)
+        #
         rmsf_file = os.path.join("/cluster/pixstor/xudong-lab/yuexu/D_PLM/analysis/", f"{pid}_analysis", f"{pid}_RMSF.tsv")
         df = pd.read_csv(rmsf_file, sep="\t")
         r1 = df["RMSF_R1"].values
@@ -166,36 +182,55 @@ if __name__ == "__main__":
         r3 = df["RMSF_R3"].values
         rep_norm_list.extend(residue_norms)
         rmsf_list.extend(r3)
-        print(r1.shape)
-
-        MDfeature_file_r1 = os.path.join(datapath_MDfeature, f"{file_name}_prod_R1_fit.h5")
+        # print(r1.shape)
+        MDfeature_file_r1 = os.path.join(datapath_MDfeature, f"{file_name[:-3]}.h5")
         if os.path.exists(MDfeature_file_r1):
             rmsf, dccm, mi, seq, pid = load_h5_file_v2(MDfeature_file_r1)
             r1 = flatten_upper(distance_matrix)
             r2 = flatten_upper(1 - np.abs(dccm))  # higher = more correlated motion
             rep_dis_list.extend(r1)
             dccm_list.extend(r2)
+        #
+        # MDfeature_file_r2 = os.path.join(datapath_MDfeature, f"{file_name}_prod_R2_fit.h5")
+        # if os.path.exists(MDfeature_file_r2):
+        #     rmsf, dccm, mi, seq, pid = load_h5_file_v2(MDfeature_file_r2)
+        #     r1 = flatten_upper(distance_matrix)
+        #     r2 = flatten_upper(1 - np.abs(dccm))  # higher = more correlated motion
+        #     rep_dis_list.extend(r1)
+        #     dccm_list.extend(r2)
         
-        MDfeature_file_r2 = os.path.join(datapath_MDfeature, f"{file_name}_prod_R2_fit.h5")
-        if os.path.exists(MDfeature_file_r2):
-            rmsf, dccm, mi, seq, pid = load_h5_file_v2(MDfeature_file_r2)
-            r1 = flatten_upper(distance_matrix)
-            r2 = flatten_upper(1 - np.abs(dccm))  # higher = more correlated motion
-            rep_dis_list.extend(r1)
-            dccm_list.extend(r2)
-        
-        MDfeature_file_r3 = os.path.join(datapath_MDfeature, f"{file_name}_prod_R3_fit.h5")
-        if os.path.exists(MDfeature_file_r3):
-            rmsf, dccm, mi, seq, pid = load_h5_file_v2(MDfeature_file_r3)
-            r1 = flatten_upper(distance_matrix)
-            r2 = flatten_upper(1 - np.abs(dccm))  # higher = more correlated motion
-            rep_dis_list.extend(r1)
-            dccm_list.extend(r2)
-        
+        # MDfeature_file_r3 = os.path.join(datapath_MDfeature, f"{file_name}_prod_R3_fit.h5")
+        # if os.path.exists(MDfeature_file_r3):
+        #     rmsf, dccm, mi, seq, pid = load_h5_file_v2(MDfeature_file_r3)
+        #     r1 = flatten_upper(distance_matrix)
+        #     r2 = flatten_upper(1 - np.abs(dccm))  # higher = more correlated motion
+        #     rep_dis_list.extend(r1)
+        #     dccm_list.extend(r2)
+        #
         # corr, _ = spearmanr(r1, r2)
         # corr_rmsf, _ = spearmanr(residue_norms, rmsf)
-
         processed_list.append(pid)
+    #
+    return (rep_norm_list, rmsf_list), (rep_dis_list, dccm_list)
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='PyTorch SimCLR')
+    parser.add_argument("--model-location", type=str, help="xx", default='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/geom2vec_tematt/checkpoints/checkpoint_0002000.pth')
+    parser.add_argument("--config-path", type=str, default='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/geom2vec_tematt/config_geom2vec_tematt.yaml', help="xx")
+    parser.add_argument("--model-type", default='d-plm', type=str, help="xx")
+    parser.add_argument("--sequence", type=str, help="xx")
+    parser.add_argument("--output_path", type=str, default='/cluster/pixstor/xudong-lab/yuexu/D_PLM/evaluate/', help="xx")
+    args = parser.parse_args()
+
+    (rep_norm_list, rmsf_list), (rep_dis_list, dccm_list) = gogogo(args)
+
+    corr, _ = spearmanr(rep_norm_list, rmsf_list)
+    plot_and_fit(rep_norm_list, rmsf_list, 'rep_norm', 'rmsf', corr, args.output_path, 'rep_norm_rmsf_dplm')
+
+    corr, _ = spearmanr(rep_dis_list, dccm_list)
+    plot_and_fit(rep_dis_list, dccm_list, 'rep_dis', 'dccm', corr, args.output_path, 'rep_dis_dccm_dplm')
+
+    
 
     
 

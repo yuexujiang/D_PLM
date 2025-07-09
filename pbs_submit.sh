@@ -390,19 +390,28 @@ sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_nu
 #####################
 task="geom2vec_tematt"
 config_path='./configs_hell/gvp_v2/config_geom2vec_tematt.yaml'
-result_path='./results/geom2vec_tematt/'
+result_path='./results/geom2vec_tematt_v2add/'
 sbatch --export=config_path=$config_path,result_path=$result_path, \
      -J ${task} \
      run_yjm85.sh
-     
+
+#####################
+task="geom2vec_tematt_morestep"
+config_path='./configs_hell/gvp_v2/config_geom2vec_tematt_morestep.yaml'
+result_path='./results/geom2vec_tematt_morestep/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
+
 #####################
 #need to submit in sbatch, need long time
-model_location=/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/DCCM_GNN_bigger/checkpoints/checkpoint_0001000.pth
-config_path=/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/DCCM_GNN_bigger/config_DCCM_GNN.yaml
-scoring_strategy=wt-mt-RLA #"mask-marginals
-python -m ESM-1v\ data.predict_splm \
-       --model-location $model_location \
-       --config-path $config_path \
-       --scoring-strategy $scoring_strategy
+task="ESM1v test"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/DCCM_GNN_bigger/checkpoints/checkpoint_0001000.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/DCCM_GNN_bigger/config_DCCM_GNN.yaml'
+scoring_strategy='wt-mt-RLA' #"mask-marginals
+sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
+       -J ${task} \
+       ./ESM-1v\ data/mutation_effect_ESM1v.pbs
+
 
 #####################################################
