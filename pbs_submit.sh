@@ -405,13 +405,22 @@ sbatch --export=config_path=$config_path,result_path=$result_path, \
 
 #####################
 #need to submit in sbatch, need long time
-task="ESM1v test"
+task="ESM1v_test"
 model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/DCCM_GNN_bigger/checkpoints/checkpoint_0001000.pth'
 config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/DCCM_GNN_bigger/config_DCCM_GNN.yaml'
 scoring_strategy='wt-mt-RLA' #"mask-marginals
 sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
        -J ${task} \
-       ./ESM-1v\ data/mutation_effect_ESM1v.pbs
+       ./ESM_1v_data/mutation_effect_ESM1v.pbs
+
+
+task="ESM1v_test_geom2vec"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/geom2vec_tematt_v2add/checkpoints/checkpoint_0002000.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/geom2vec_tematt_v2add/config_geom2vec_tematt.yaml'
+scoring_strategy='wt-mt-RLA' #"mask-marginals
+sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
+       -J ${task} \
+       ./ESM_1v_data/mutation_effect_ESM1v.pbs
 
 
 #####################################################
