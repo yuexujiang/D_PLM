@@ -10,8 +10,7 @@ from model import prepare_models, AverageMeter, info_nce_loss, info_nce_weights
 from model import log_negative_mean_logtis
 from model import MaskedLMDataCollator
 
-from utils.utils import prepare_optimizer, load_checkpoints, load_checkpoints_md, save_checkpoints, load_configs, test_gpu_cuda, \
-    prepare_saving_dir
+from utils.utils import prepare_optimizer, load_checkpoints, load_checkpoints_md, save_checkpoints, load_configs, test_gpu_cuda, prepare_saving_dir, save_best_checkpoints
 from utils.utils import get_logging, prepare_tensorboard
 from utils.utils import accuracy, residue_batch_sample
 from utils.evaluation import evaluate_with_deaminase, evaluate_with_kinase, evaluate_with_cath_more, \
@@ -381,6 +380,9 @@ def training_loop_Geom2ve_tematt(simclr, start_step, train_loader, val_loader, t
        seq_evaluation_loop(simclr, n_steps, configs, batch_converter, result_path, valid_writer,logging, accelerator)
        struct_evaluation_loop(simclr, n_steps, configs, result_path, valid_writer,logging, accelerator)
     """
+    best_val_loss = np.inf
+    best_val_graph_loss = np.inf
+    best_val_residue_loss = np.inf
     while True:
         epoch_num += 1
         if accelerator.is_main_process:
@@ -467,13 +469,25 @@ def training_loop_Geom2ve_tematt(simclr, start_step, train_loader, val_loader, t
                     #                 loss=loss, bsz=bsz, train_writer=train_writer,valid_writer=valid_writer,
                     #                 masked_lm_data_collator=masked_lm_data_collator, logging=logging,
                     #                 accelerator=accelerator)
-                    evaluation_loop(simclr, val_loader, labels, labels_residue, batch_converter, criterion, configs,
+                    loss_val, val_graph_loss, val_residue_loss = evaluation_loop(simclr, val_loader, labels, labels_residue, batch_converter, criterion, configs,
                                     simclr_loss=simclr_loss, simclr_residue_loss=simclr_residue_loss, MLM_loss = MLM_loss,losses=losses,
                                     n_steps=n_steps, scheduler_seq=scheduler_seq, result_path=result_path,
                                     scheduler_struct=scheduler_x, logits=logits, logits_residue=logits_residue,
                                     loss=loss, bsz=bsz, train_writer=train_writer,valid_writer=valid_writer,
                                     masked_lm_data_collator=masked_lm_data_collator, logging=logging,
                                     accelerator=accelerator)
+                    best_val_loss = save_best_checkpoints(accelerator.unwrap_model(optimizer_x),
+                                     accelerator.unwrap_model(optimizer_seq),
+                                     result_path, accelerator.unwrap_model(simclr), n_steps, logging, epoch_num,
+                                     best_val_loss, loss_val, 'best_val_whole_loss')
+                    best_val_graph_loss = save_best_checkpoints(accelerator.unwrap_model(optimizer_x),
+                                     accelerator.unwrap_model(optimizer_seq),
+                                     result_path, accelerator.unwrap_model(simclr), n_steps, logging, epoch_num,
+                                     best_val_graph_loss, val_graph_loss, 'best_val_graph_loss')
+                    best_val_residue_loss = save_best_checkpoints(accelerator.unwrap_model(optimizer_x),
+                                     accelerator.unwrap_model(optimizer_seq),
+                                     result_path, accelerator.unwrap_model(simclr), n_steps, logging, epoch_num,
+                                     best_val_residue_loss, val_residue_loss, 'best_val_residue_loss')
 
                 # if configs.valid_settings.eval_struct.enable and (
                 #         n_steps % configs.valid_settings.eval_struct.do_every == 0) and n_steps != 0:  # or n_steps == 1):
@@ -1074,6 +1088,7 @@ def evaluation_loop(simclr, val_loader, labels, labels_residue, batch_converter,
         valid_writer.add_scalar('n_s_s_residue', val_negsim_seq_seq_residue, n_steps)
     if accelerator.is_main_process:
        seq_evaluation_loop(simclr, n_steps, configs, batch_converter, result_path, valid_writer, logging, accelerator)
+    return loss_val, val_graph_loss, val_residue_loss
 
 
 def seq_evaluation_loop(simclr, n_steps, configs, batch_converter, result_path, valid_writer, logging, accelerator):

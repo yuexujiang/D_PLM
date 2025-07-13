@@ -1,5 +1,5 @@
 fix_seed: 0
-checkpoints_every: 50
+checkpoints_every: 500
 tensorboard_log: True
 result_path: ./results/test
 # HF_cache_path: ./HF_cashe_path
@@ -115,10 +115,10 @@ train_settings:
   Atlas_data_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_data
   Atlas_test_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_test
   Atlas_v2add_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_v2add
-  num_steps: 10000 #10000000
+  num_steps: 6000 #10000000
   shuffle: True
   mixed_precision: "fp16" # no, fp16, bf16, fp8
-  batch_size: 8
+  batch_size: 16
   residue_batch_size: 2000
   num_workers: 1
   gradient_accumulation: 1
@@ -135,7 +135,7 @@ valid_settings:
   kinase_path: /cluster/pixstor/xudong-lab/duolin/simCLR/kinase_clustering/GPS5.0_homo_hasPK_with_kinasedomain.txt
   do_every: 50 # steps
   num_workers: 1
-  batch_size: 8
+  batch_size: 16
   eval_struct: 
       enable: False
       do_every: 1000
