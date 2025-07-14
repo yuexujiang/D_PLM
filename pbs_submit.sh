@@ -403,6 +403,20 @@ sbatch --export=config_path=$config_path,result_path=$result_path, \
      -J ${task} \
      run_yjm85.sh
 
+task="geom2vec_tematt_morestep2"
+config_path='./configs_hell/gvp_v2/config_geom2vec_tematt_morestep_2.yaml'
+result_path='./results/geom2vec_tematt_morestep2/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
+
+task="geom2vec_tematt_morestep3"
+config_path='./configs_hell/gvp_v2/config_geom2vec_tematt_morestep_3.yaml'
+result_path='./results/geom2vec_tematt_morestep3/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
+
 #####################
 #need to submit in sbatch, need long time
 task="ESM1v_test"
