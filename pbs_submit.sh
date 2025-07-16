@@ -417,6 +417,27 @@ sbatch --export=config_path=$config_path,result_path=$result_path, \
      -J ${task} \
      run_yjm85.sh
 
+task="geom2vec_temcnn"
+config_path='./configs_hell/gvp_v2/config_geom2vec_temcnn.yaml'
+result_path='./results/geom2vec_temcnn/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
+
+task="geom2vec_temcnn_fix"
+config_path='./configs_hell/gvp_v2/config_geom2vec_temcnn_fix.yaml'
+result_path='./results/geom2vec_temcnn_fix/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
+
+task="geom2vec_temcnn_fix_mlm"
+config_path='./configs_hell/gvp_v2/config_geom2vec_temcnn_fix_mlm.yaml'
+result_path='./results/geom2vec_temcnn_fix_mlm/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
+
 #####################
 #need to submit in sbatch, need long time
 task="ESM1v_test"

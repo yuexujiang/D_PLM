@@ -360,7 +360,7 @@ def training_loop_DCCM_GNN(simclr, start_step, train_loader, val_loader, test_lo
 
 def training_loop_Geom2ve_tematt(simclr, start_step, train_loader, val_loader, test_loader, batch_converter, criterion,
             optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, train_writer, valid_writer,
-            result_path, logging, configs, masked_lm_data_collator=None, **kwargs):
+            result_path, logging, configs, replicate, masked_lm_data_collator=None, **kwargs):
     torch.cuda.empty_cache()
     accelerator = kwargs['accelerator']
 
@@ -500,16 +500,16 @@ def training_loop_Geom2ve_tematt(simclr, start_step, train_loader, val_loader, t
                 train_loss = 0
 
             n_sub_steps += 1
-            # repli_num = configs.train_settings.num_steps if replicate == 2 else (configs.train_settings.num_steps // 3) * (replicate + 1)
-            # if n_steps > repli_num:
-            if n_steps > configs.train_settings.num_steps:
+            repli_num = configs.train_settings.num_steps if replicate == 2 else (configs.train_settings.num_steps // 3) * (replicate + 1)
+            if n_steps > repli_num:
+            # if n_steps > configs.train_settings.num_steps:
                 break
 
         end = time.time()
 
-        # repli_num = configs.train_settings.num_steps if replicate == 2 else (configs.train_settings.num_steps // 3) * (replicate + 1)
-        # if n_steps > repli_num:
-        if n_steps > configs.train_settings.num_steps:
+        repli_num = configs.train_settings.num_steps if replicate == 2 else (configs.train_settings.num_steps // 3) * (replicate + 1)
+        if n_steps > repli_num:
+        # if n_steps > configs.train_settings.num_steps:
             break
 
         if accelerator.is_main_process:
@@ -1289,8 +1289,17 @@ def main(args, dict_configs, config_file_path):
                                                                                                         (train_dataloader_repli_2, val_dataloader_repli_2, test_dataloader_repli_2)))
     elif configs.model.X_module == 'Geom2vec_tematt':
         from data.data_geom2vec_tematt import prepare_dataloaders
-        train_loader, val_loader, test_loader = prepare_dataloaders(configs)
-        train_loader, val_loader, test_loader=accelerator.prepare(train_loader, val_loader, test_loader)
+        # train_loader, val_loader, test_loader = prepare_dataloaders(configs)
+        # train_loader, val_loader, test_loader=accelerator.prepare(train_loader, val_loader, test_loader)
+        ((train_dataloader_repli_0, val_dataloader_repli_0, test_dataloader_repli_0),
+         (train_dataloader_repli_1, val_dataloader_repli_1, test_dataloader_repli_1),
+         (train_dataloader_repli_2, val_dataloader_repli_2, test_dataloader_repli_2)) = prepare_dataloaders(configs)
+        ((train_dataloader_repli_0, val_dataloader_repli_0, test_dataloader_repli_0),
+        (train_dataloader_repli_1, val_dataloader_repli_1, test_dataloader_repli_1),
+        (train_dataloader_repli_2, val_dataloader_repli_2, test_dataloader_repli_2))=accelerator.prepare(((train_dataloader_repli_0, val_dataloader_repli_0, test_dataloader_repli_0),
+                                                                                                        (train_dataloader_repli_1, val_dataloader_repli_1, test_dataloader_repli_1),
+                                                                                                        (train_dataloader_repli_2, val_dataloader_repli_2, test_dataloader_repli_2)))
+        
     elif configs.model.X_module == 'structure':
         if hasattr(configs.model.struct_encoder,"version") and configs.model.struct_encoder.version == 'v2':
             from data.data_v2 import prepare_dataloaders as prepare_dataloaders_v2
@@ -1314,9 +1323,9 @@ def main(args, dict_configs, config_file_path):
         logging.info(f"Start contrastive training for {configs.train_settings.num_steps} steps.")
 
     if accelerator.is_main_process:
-        if configs.model.X_module == 'structure' or configs.model.X_module == 'Geom2vec_tematt':
+        if configs.model.X_module == 'structure':
             train_steps = np.ceil(len(train_loader) / configs.train_settings.gradient_accumulation)
-        elif configs.model.X_module == 'MD' or configs.model.X_module == 'DCCM_GNN':
+        elif configs.model.X_module == 'MD' or configs.model.X_module == 'DCCM_GNN' or configs.model.X_module == 'Geom2vec_tematt':
             train_steps = np.ceil(len(train_dataloader_repli_0) / configs.train_settings.gradient_accumulation)
             train_steps = train_steps * 3
         logging.info(f'Number of train steps per epoch: {int(train_steps)}')
