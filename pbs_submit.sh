@@ -436,5 +436,59 @@ sbatch --export=model_location=$model_location,config_path=$config_path,scoring_
        -J ${task} \
        ./ESM_1v_data/mutation_effect_ESM1v.pbs
 
+task="ESM1v_test_geom2vec_morestep"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/geom2vec_tematt_morestep/checkpoints/checkpoint_best_val_whole_loss.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/geom2vec_tematt_morestep/config_geom2vec_tematt_morestep.yaml'
+scoring_strategy='wt-mt-RLA' #"mask-marginals
+sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
+       -J ${task} \
+       ./ESM_1v_data/mutation_effect_ESM1v.pbs
 
+task="ESM1v_test_geom2vec_morestep2"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/geom2vec_tematt_morestep2/checkpoints/checkpoint_best_val_whole_loss.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/geom2vec_tematt_morestep2/config_geom2vec_tematt_morestep_2.yaml'
+scoring_strategy='wt-mt-RLA' #"mask-marginals
+sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
+       -J ${task} \
+       ./ESM_1v_data/mutation_effect_ESM1v.pbs
+
+task="ESM1v_test_geom2vec_morestep3"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/geom2vec_tematt_morestep3/checkpoints/checkpoint_best_val_whole_loss.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/geom2vec_tematt_morestep3/config_geom2vec_tematt_morestep_3.yaml'
+scoring_strategy='wt-mt-RLA' #"mask-marginals
+sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
+       -J ${task} \
+       ./ESM_1v_data/mutation_effect_ESM1v.pbs
+
+task="ESM1v_test_vivit_mlm_450"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/dplm_mlm/checkpoints/checkpoint_0000450.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/dplm_mlm/config_mlm.yaml'
+scoring_strategy='wt-mt-RLA' #"mask-marginals
+sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
+       -J ${task} \
+       ./ESM_1v_data/mutation_effect_ESM1v.pbs
+
+task="ESM1v_test_vivit_nomlm_750"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/dplm/checkpoints/checkpoint_0000750.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/dplm/config.yaml'
+scoring_strategy='wt-mt-RLA' #"mask-marginals
+sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
+       -J ${task} \
+       ./ESM_1v_data/mutation_effect_ESM1v.pbs
+
+task="ESM1v_test_vivit_nomlm_3500"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/dplm/checkpoints/checkpoint_0003500.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/dplm/config.yaml'
+scoring_strategy='wt-mt-RLA' #"mask-marginals
+sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
+       -J ${task} \
+       ./ESM_1v_data/mutation_effect_ESM1v.pbs
+
+task="ESM1v_test_vivit_mlm_3500"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/dplm_mlm/checkpoints/checkpoint_0003500.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/dplm_mlm/config_mlm.yaml'
+scoring_strategy='wt-mt-RLA' #"mask-marginals
+sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
+       -J ${task} \
+       ./ESM_1v_data/mutation_effect_ESM1v.pbs
 #####################################################

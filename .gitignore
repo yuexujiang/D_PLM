@@ -1,5 +1,6 @@
 /results/*
 /NRI_paper/*
-/ESM-1v data/*
+/ESM-1v data/data_wedownloaded/*
 /Atlas_test/*
 /geom2vec_main/*
+/docs/*

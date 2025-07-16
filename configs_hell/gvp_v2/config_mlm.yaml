@@ -118,6 +118,7 @@ optimizer:
   lr_seq: 0.01
   lr_struct: 0.00001
   lr_MD: 0.0001
+  lr_x: 0.0001
   weight_decouple: True
   weight_decay: 0.0005
   eps: 1e-16
@@ -129,5 +130,6 @@ optimizer:
     min_lr_seq: 0
     min_lr_struct: 0
     min_lr_MD: 0
+    min_lr_x: 0
     gamma: 1
     first_cycle_steps: 80
