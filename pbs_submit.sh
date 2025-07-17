@@ -193,67 +193,14 @@ sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_nu
      -J ${task} \
      data_process.pbs
      
-task="data5"
-folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
-num=5
-split_num=10
-outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_test'
-sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
-     -J ${task} \
-     data_process.pbs
 
-task="data6"
-folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
-num=6
-split_num=10
-outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_test'
-sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
-     -J ${task} \
-     data_process.pbs
-
-task="data7"
-folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
-num=7
-split_num=10
-outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_test'
-sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
-     -J ${task} \
-     data_process.pbs
-
-task="data8"
-folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
-num=8
-split_num=10
-outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_test'
-sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
-     -J ${task} \
-     data_process.pbs
-
-task="data9"
-folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
-num=9
-split_num=10
-outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_test'
-sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
-     -J ${task} \
-     data_process.pbs
-
-
-task="DCCM_GNN_bigger"
-config_path='./configs_hell/gvp_v2/config_DCCM_GNN.yaml'
-result_path='./results/DCCM_GNN_bigger/'
-sbatch --export=config_path=$config_path,result_path=$result_path, \
-     -J ${task} \
-     run_yjm85.sh
-     
-     
 ########################     
      
 task="data_0"
 folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
 num=0
-split_num=10
-outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_data'
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_vivit_data'
 sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
      -J ${task} \
      data_process.pbs
@@ -261,8 +208,8 @@ sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_nu
 task="data_1"
 folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
 num=1
-split_num=10
-outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_data'
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_vivit_data'
 sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
      -J ${task} \
      data_process.pbs
@@ -270,8 +217,8 @@ sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_nu
 task="data_2"
 folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
 num=2
-split_num=10
-outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_data'
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_vivit_data'
 sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
      -J ${task} \
      data_process.pbs
@@ -279,8 +226,8 @@ sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_nu
 task="data_3"
 folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
 num=3
-split_num=10
-outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_data'
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_vivit_data'
 sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
      -J ${task} \
      data_process.pbs
@@ -288,53 +235,56 @@ sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_nu
 task="data_4"
 folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
 num=4
-split_num=10
-outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_data'
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_vivit_data'
 sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
      -J ${task} \
      data_process.pbs
      
-task="data_5"
-folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
-num=5
-split_num=10
-outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_data'
+
+###########################
+
+task='v2_0'
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
+num=0
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_vivit_data'
 sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
      -J ${task} \
      data_process.pbs
      
-task="data_6"
-folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
-num=6
-split_num=10
-outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_data'
+task='v2_1'
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
+num=1
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_vivit_data'
 sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
      -J ${task} \
      data_process.pbs
      
-task="data_7"
-folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
-num=7
-split_num=10
-outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_data'
+task='v2_2'
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
+num=2
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_vivit_data'
 sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
      -J ${task} \
      data_process.pbs
      
-task="data_8"
-folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
-num=8
-split_num=10
-outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_data'
+task='v2_3'
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
+num=3
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_vivit_data'
 sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
      -J ${task} \
      data_process.pbs
-     
-task="data_9"
-folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
-num=9
-split_num=10
-outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_data'
+
+task='v2_4'
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
+num=4
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_vivit_data'
 sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
      -J ${task} \
      data_process.pbs
@@ -342,49 +292,49 @@ sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_nu
 #########################
 
 task="test_0"
-folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
 num=0
 split_num=5
-outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_v2add'
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_vivit_test'
 sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
      -J ${task} \
      data_process.pbs
      
 task="test_1"
-folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
 num=1
 split_num=5
-outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_v2add'
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_vivit_test'
 sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
      -J ${task} \
      data_process.pbs
-     
+
 task="test_2"
-folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
 num=2
 split_num=5
-outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_v2add'
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_vivit_test'
 sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
      -J ${task} \
      data_process.pbs
-     
+
 task="test_3"
-folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
 num=3
 split_num=5
-outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_v2add'
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_vivit_test'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs 
+
+task="test_4"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
+num=4
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_vivit_test'
 sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
      -J ${task} \
      data_process.pbs
-     
-task="test_4"
-folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
-num=4
-split_num=5
-outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_v2add'
-sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
-     -J ${task} \
-     data_process.pbs  
 
      
 #####################

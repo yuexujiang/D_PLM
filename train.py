@@ -515,7 +515,7 @@ def training_loop_Geom2ve_tematt(simclr, start_step, train_loader, val_loader, t
         if accelerator.is_main_process:
             logging.info(f"one epoch cost {(end - start):.2f}, number of trained steps {n_steps}")
 
-    # return n_steps, accelerator, optimizer_x, optimizer_seq, scheduler_x, scheduler_seq
+    return n_steps, accelerator, optimizer_x, optimizer_seq, scheduler_x, scheduler_seq
 
 def prepare_loss_MD(simclr,traj,batch_tokens,criterion, loss,
                  accelerator, configs,
@@ -1338,11 +1338,27 @@ def main(args, dict_configs, config_file_path):
             result_path, logging, configs, masked_lm_data_collator=masked_lm_data_collator, accelerator=accelerator
         )
     elif configs.model.X_module == 'Geom2vec_tematt':
-        training_loop_Geom2ve_tematt(
-            simclr, start_step,train_loader, val_loader, test_loader, batch_converter, criterion,
+        # training_loop_Geom2ve_tematt(
+        #     simclr, start_step,train_loader, val_loader, test_loader, batch_converter, criterion,
+        #     optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, train_writer, valid_writer,
+        #     result_path, logging, configs, masked_lm_data_collator=masked_lm_data_collator, accelerator=accelerator
+        # )
+        start_step, accelerator, optimizer_x, optimizer_seq, scheduler_x, scheduler_seq = training_loop_Geom2ve_tematt(
+            simclr, start_step, train_dataloader_repli_0, val_dataloader_repli_0, test_dataloader_repli_0, batch_converter, criterion,
             optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, train_writer, valid_writer,
-            result_path, logging, configs, masked_lm_data_collator=masked_lm_data_collator, accelerator=accelerator
+            result_path, logging, configs, replicate=0, masked_lm_data_collator=masked_lm_data_collator, accelerator=accelerator
         )
+        start_step, accelerator, optimizer_x, optimizer_seq, scheduler_x, scheduler_seq = training_loop_Geom2ve_tematt(
+            simclr, start_step, train_dataloader_repli_0, val_dataloader_repli_0, test_dataloader_repli_0, batch_converter, criterion,
+            optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, train_writer, valid_writer,
+            result_path, logging, configs, replicate=1, masked_lm_data_collator=masked_lm_data_collator, accelerator=accelerator
+        )
+        start_step, accelerator, optimizer_x, optimizer_seq, scheduler_x, scheduler_seq = training_loop_Geom2ve_tematt(
+            simclr, start_step, train_dataloader_repli_0, val_dataloader_repli_0, test_dataloader_repli_0, batch_converter, criterion,
+            optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, train_writer, valid_writer,
+            result_path, logging, configs, replicate=2, masked_lm_data_collator=masked_lm_data_collator, accelerator=accelerator
+        )
+
     elif configs.model.X_module == 'MD':
         start_step, accelerator, optimizer_x, optimizer_seq, scheduler_x, scheduler_seq = training_loop_MD(
             simclr, start_step, train_dataloader_repli_0, val_dataloader_repli_0, test_dataloader_repli_0, batch_converter, criterion,

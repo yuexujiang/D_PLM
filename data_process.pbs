@@ -24,4 +24,5 @@ export HF_HOME=/cluster/pixstor/xudong-lab/yuexu/transformers_cache/
 #accelerate launch $command --config_path $config_filename --result_path $result_path
 #python -m data.data_MD --data_folder2search $folder --list_num $num --output_folder $outfolder --split_num $split_num
 #python ./data/preprocess_traj.py --data_folder2search $folder --list_num $num --output_folder $outfolder --split_num $split_num
-python -m data.preprocess_geom2vec --data_folder2search $folder --list_num $num --output_folder $outfolder --split_num $split_num
+# python -m data.preprocess_geom2vec --data_folder2search $folder --list_num $num --output_folder $outfolder --split_num $split_num
+python -m data.preprocess_vivit --data_folder2search $folder --list_num $num --output_folder $outfolder --split_num $split_num
