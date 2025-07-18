@@ -20,6 +20,7 @@ model:
     model_name: google/vivit-b-16x2-kinetics400
     residue_inner_dim: 1024
     protein_inner_dim: 4096
+    dim_mlp: 768
     fine_tuning:
          enable: False
     fine_tuning_projct:

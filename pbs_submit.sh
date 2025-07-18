@@ -388,6 +388,13 @@ sbatch --export=config_path=$config_path,result_path=$result_path, \
      -J ${task} \
      run_yjm85.sh
 
+task="geom2vec_temlstmatt"
+config_path='./configs_hell/gvp_v2/config_geom2vec_temlstmatt.yaml'
+result_path='./results/geom2vec_temlstmatt/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
+
 #####################
 #need to submit in sbatch, need long time
 task="ESM1v_test"

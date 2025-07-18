@@ -1246,6 +1246,8 @@ def main(args, dict_configs, config_file_path):
             print("to do...")
         if configs.model.X_module == 'Geom2vec_tematt':
             print("to do...")
+        if configs.model.X_module == 'Geom2vec_temlstmatt':
+            print("to do...")
     
     alphabet = simclr.model_seq.alphabet
     batch_converter = alphabet.get_batch_converter(truncation_seq_length=configs.model.esm_encoder.max_length)
@@ -1258,6 +1260,17 @@ def main(args, dict_configs, config_file_path):
 
     if configs.model.X_module == 'MD':
         from data.data_MD import prepare_dataloaders
+        ((train_dataloader_repli_0, val_dataloader_repli_0, test_dataloader_repli_0),
+         (train_dataloader_repli_1, val_dataloader_repli_1, test_dataloader_repli_1),
+         (train_dataloader_repli_2, val_dataloader_repli_2, test_dataloader_repli_2)) = prepare_dataloaders(configs)
+        # val_loader = prepare_dataloaders_v2(configs)
+        ((train_dataloader_repli_0, val_dataloader_repli_0, test_dataloader_repli_0),
+        (train_dataloader_repli_1, val_dataloader_repli_1, test_dataloader_repli_1),
+        (train_dataloader_repli_2, val_dataloader_repli_2, test_dataloader_repli_2))=accelerator.prepare(((train_dataloader_repli_0, val_dataloader_repli_0, test_dataloader_repli_0),
+                                                                                                        (train_dataloader_repli_1, val_dataloader_repli_1, test_dataloader_repli_1),
+                                                                                                        (train_dataloader_repli_2, val_dataloader_repli_2, test_dataloader_repli_2)))
+    if configs.model.X_module == 'vivit':
+        from data.data_vivit import prepare_dataloaders
         ((train_dataloader_repli_0, val_dataloader_repli_0, test_dataloader_repli_0),
          (train_dataloader_repli_1, val_dataloader_repli_1, test_dataloader_repli_1),
          (train_dataloader_repli_2, val_dataloader_repli_2, test_dataloader_repli_2)) = prepare_dataloaders(configs)
@@ -1287,7 +1300,7 @@ def main(args, dict_configs, config_file_path):
         (train_dataloader_repli_2, val_dataloader_repli_2, test_dataloader_repli_2))=accelerator.prepare(((train_dataloader_repli_0, val_dataloader_repli_0, test_dataloader_repli_0),
                                                                                                         (train_dataloader_repli_1, val_dataloader_repli_1, test_dataloader_repli_1),
                                                                                                         (train_dataloader_repli_2, val_dataloader_repli_2, test_dataloader_repli_2)))
-    elif configs.model.X_module == 'Geom2vec_tematt':
+    elif configs.model.X_module == 'Geom2vec_tematt' or configs.model.X_module == 'Geom2vec_temlstmatt':
         from data.data_geom2vec_tematt import prepare_dataloaders
         # train_loader, val_loader, test_loader = prepare_dataloaders(configs)
         # train_loader, val_loader, test_loader=accelerator.prepare(train_loader, val_loader, test_loader)
@@ -1325,7 +1338,11 @@ def main(args, dict_configs, config_file_path):
     if accelerator.is_main_process:
         if configs.model.X_module == 'structure':
             train_steps = np.ceil(len(train_loader) / configs.train_settings.gradient_accumulation)
-        elif configs.model.X_module == 'MD' or configs.model.X_module == 'DCCM_GNN' or configs.model.X_module == 'Geom2vec_tematt':
+        elif configs.model.X_module == 'MD' or \
+            configs.model.X_module == 'DCCM_GNN' or \
+                configs.model.X_module == 'Geom2vec_tematt' or \
+                    configs.model.X_module == 'Geom2vec_temlstmatt' or \
+                        configs.model.X_module == 'vivit':
             train_steps = np.ceil(len(train_dataloader_repli_0) / configs.train_settings.gradient_accumulation)
             train_steps = train_steps * 3
         logging.info(f'Number of train steps per epoch: {int(train_steps)}')
@@ -1337,7 +1354,7 @@ def main(args, dict_configs, config_file_path):
             optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, train_writer, valid_writer,
             result_path, logging, configs, masked_lm_data_collator=masked_lm_data_collator, accelerator=accelerator
         )
-    elif configs.model.X_module == 'Geom2vec_tematt':
+    elif configs.model.X_module == 'Geom2vec_tematt' or configs.model.X_module == 'Geom2vec_temlstmatt':
         # training_loop_Geom2ve_tematt(
         #     simclr, start_step,train_loader, val_loader, test_loader, batch_converter, criterion,
         #     optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, train_writer, valid_writer,
@@ -1359,7 +1376,7 @@ def main(args, dict_configs, config_file_path):
             result_path, logging, configs, replicate=2, masked_lm_data_collator=masked_lm_data_collator, accelerator=accelerator
         )
 
-    elif configs.model.X_module == 'MD':
+    elif configs.model.X_module == 'MD' or configs.model.X_module == 'vivit':
         start_step, accelerator, optimizer_x, optimizer_seq, scheduler_x, scheduler_seq = training_loop_MD(
             simclr, start_step, train_dataloader_repli_0, val_dataloader_repli_0, test_dataloader_repli_0, batch_converter, criterion,
             optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, train_writer, valid_writer,

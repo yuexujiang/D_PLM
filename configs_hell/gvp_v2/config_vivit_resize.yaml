@@ -14,13 +14,13 @@ model:
   protein_out_dim: 256
   residue_num_projector: 1
   protein_num_projector: 2
-  X_module: MD #structure
+  X_module: vivit #structure
 
   MD_encoder:
     model_name: google/vivit-b-16x2-kinetics400
     residue_inner_dim: 1024
     protein_inner_dim: 4096
-    dim_mlp: 768
+    dim_mlp: 2304
     fine_tuning:
          enable: False
     fine_tuning_projct:
@@ -78,12 +78,12 @@ model:
 train_settings:
   MD_data_path: ./data/MD/dev_data/
   #data_path: /cluster/pixstor/xudong-lab/duolin/swiss-pos-512-v2_splitdata/train/
-  Atlas_data_repli_0_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_data_rep0
-  Atlas_data_repli_1_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_data_rep1
-  Atlas_data_repli_2_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_data_rep2
-  Atlas_test_repli_0_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_test_rep0
-  Atlas_test_repli_1_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_test_rep1
-  Atlas_test_repli_2_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_test_rep2
+  Atlas_data_repli_0_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_vivit_data_rep0
+  Atlas_data_repli_1_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_vivit_data_rep1
+  Atlas_data_repli_2_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_vivit_data_rep2
+  Atlas_test_repli_0_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_vivit_test_rep0
+  Atlas_test_repli_1_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_vivit_test_rep1
+  Atlas_test_repli_2_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_vivit_test_rep2
   num_steps: 5000 #10000000
   shuffle: True
   mixed_precision: "fp16" # no, fp16, bf16, fp8
