@@ -991,7 +991,7 @@ def evaluation_loop(simclr, val_loader, labels, labels_residue, batch_converter,
         batch_seq = [(batch['pid'][i], str(batch['seq'][i])) for i in range(len(batch['seq']))]  # batch['seq']
         bsz = len(batch)
         batch_labels, batch_strs, batch_tokens = batch_converter(batch_seq)
-        if configs.model.X_module=="Geom2vec_tematt":
+        if configs.model.X_module=="Geom2vec_tematt" or configs.model.X_module=="Geom2vec_temlstmatt":
             res_rep = batch['res_rep']
             batch_idx = batch['batch_idx']
             graph = [res_rep.to(accelerator.device), batch_idx.to(accelerator.device)]

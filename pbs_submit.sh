@@ -395,6 +395,13 @@ sbatch --export=config_path=$config_path,result_path=$result_path, \
      -J ${task} \
      run_yjm85.sh
 
+task="geom2vec_vivit"
+config_path='./configs_hell/gvp_v2/config_vivit_resize.yaml'
+result_path='./results/vivit_resize/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
+
 #####################
 #need to submit in sbatch, need long time
 task="ESM1v_test"
@@ -470,3 +477,23 @@ sbatch --export=model_location=$model_location,config_path=$config_path,scoring_
        -J ${task} \
        ./ESM_1v_data/mutation_effect_ESM1v.pbs
 #####################################################
+task="v2"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_gvp_data/'
+sbatch --export=folder=$folder,outfolder=$outfolder, \
+     -J ${task} \
+     data_process.pbs
+
+task="data"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_gvp_data/'
+sbatch --export=folder=$folder,outfolder=$outfolder, \
+     -J ${task} \
+     data_process.pbs
+
+task="v2"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_gvp_test/'
+sbatch --export=folder=$folder,outfolder=$outfolder, \
+     -J ${task} \
+     data_process.pbs
