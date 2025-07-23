@@ -402,6 +402,26 @@ sbatch --export=config_path=$config_path,result_path=$result_path, \
      -J ${task} \
      run_yjm85.sh
 
+task="vivit_meanrep"
+config_path='./configs_hell/gvp_v2/config_vivit_meanrep.yaml'
+result_path='./results/vivit_meanrep/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
+
+task="vivit_splm"
+config_path='./configs_hell/gvp_v2/config_vivit_splm.yaml'
+result_path='./results/vivit_splm/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
+
+task="vivit_hyper1"
+config_path='./configs_hell/gvp_v2/config_vivit_hyper1.yaml'
+result_path='./results/vivit_hyper1/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
 #####################
 #need to submit in sbatch, need long time
 task="ESM1v_test"
@@ -461,17 +481,41 @@ sbatch --export=model_location=$model_location,config_path=$config_path,scoring_
        -J ${task} \
        ./ESM_1v_data/mutation_effect_ESM1v.pbs
 
-task="ESM1v_test_vivit_nomlm_3500"
-model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/dplm/checkpoints/checkpoint_0003500.pth'
-config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/dplm/config.yaml'
+task="ESM1v_test_geom2vec_temcnn"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/geom2vec_temcnn/checkpoints/checkpoint_best_val_whole_loss.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/geom2vec_temcnn/config_geom2vec_temcnn.yaml'
 scoring_strategy='wt-mt-RLA' #"mask-marginals
 sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
        -J ${task} \
        ./ESM_1v_data/mutation_effect_ESM1v.pbs
 
-task="ESM1v_test_vivit_mlm_3500"
-model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/dplm_mlm/checkpoints/checkpoint_0003500.pth'
-config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/dplm_mlm/config_mlm.yaml'
+task="geom2vec_temcnn_fix"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/geom2vec_temcnn_fix/checkpoints/checkpoint_best_val_whole_loss.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/geom2vec_temcnn_fix/config_geom2vec_temcnn_fix.yaml'
+scoring_strategy='wt-mt-RLA' #"mask-marginals
+sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
+       -J ${task} \
+       ./ESM_1v_data/mutation_effect_ESM1v.pbs
+
+task="geom2vec_temcnn_fix_mlm"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/geom2vec_temcnn_fix_mlm/checkpoints/checkpoint_best_val_whole_loss.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/geom2vec_temcnn_fix_mlm/config_geom2vec_temcnn_fix_mlm.yaml'
+scoring_strategy='wt-mt-RLA' #"mask-marginals
+sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
+       -J ${task} \
+       ./ESM_1v_data/mutation_effect_ESM1v.pbs
+
+task="geom2vec_temlstmatt"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/geom2vec_temlstmatt/checkpoints/checkpoint_best_val_whole_loss.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/geom2vec_temlstmatt/config_geom2vec_temlstmatt.yaml'
+scoring_strategy='wt-mt-RLA' #"mask-marginals
+sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
+       -J ${task} \
+       ./ESM_1v_data/mutation_effect_ESM1v.pbs
+
+task="vivit_resize"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_resize/checkpoints/checkpoint_0004950.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_resize/config_vivit_resize.yaml'
 scoring_strategy='wt-mt-RLA' #"mask-marginals
 sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
        -J ${task} \
@@ -491,7 +535,7 @@ sbatch --export=folder=$folder,outfolder=$outfolder, \
      -J ${task} \
      data_process.pbs
 
-task="v2"
+task="test"
 folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
 outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_gvp_test/'
 sbatch --export=folder=$folder,outfolder=$outfolder, \

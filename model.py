@@ -259,6 +259,173 @@ class GVPEncoder(nn.Module):  # embedding table can be tuned
         else:
             return graph_feature, residue_feature
 
+class GVP_lstm(nn.Module):  
+    def __init__(self, 
+                 configs,
+                 input_dim=512, 
+                 hidden_dim=128, 
+                 output_dim=32,
+                 residue_inner_dim=4096,
+                 residue_out_dim=256,
+                 protein_out_dim=256,
+                 residue_num_projector=2,
+                 protein_inner_dim=4096, 
+                 protein_num_projector=2,
+                 lstm_layers=2,
+                 dropout_rate=0.1):
+        """
+        BiLSTM-based temporal encoder with attention mechanism
+        
+        Args:
+            lstm_layers: Number of LSTM layers
+            dropout_rate: Dropout rate for LSTM and attention
+        """
+        super(GVP_lstm, self).__init__()
+        node_in_dim = [6, 3] #default
+        if configs.model.struct_encoder.use_foldseek:
+            node_in_dim[0] += 10 #foldseek has 10 more node scalar features
+        if configs.model.struct_encoder.use_foldseek_vector:
+            node_in_dim[1] += 6 #foldseek_vector has 6 more node vector features
+        node_in_dim = tuple(node_in_dim)
+        if configs.model.struct_encoder.use_rotary_embeddings:
+            if configs.model.struct_encoder.rotary_mode==3:
+                edge_in_dim = (configs.model.struct_encoder.num_rbf+8,1) #16+2+3+3 only for mode ==3 add 8D pos_embeddings
+            else: 
+                edge_in_dim = (configs.model.struct_encoder.num_rbf+2,1) #16+2 
+        else:
+              edge_in_dim = (configs.model.struct_encoder.num_rbf+configs.model.struct_encoder.num_positional_embeddings, 1) #num_rbf+num_positional_embeddings
+        node_h_dim = configs.model.struct_encoder.node_h_dim
+        # node_h_dim=(100, 16) #default
+        #node_h_dim = (100, 32)  # seems best?
+        edge_h_dim=configs.model.struct_encoder.edge_h_dim
+        #edge_h_dim = (32, 1) #default
+        gvp_num_layers = configs.model.struct_encoder.gvp_num_layers
+        #gvp_num_layers = 3
+        self.backbone = gvp.models.structure_encoder(node_in_dim, node_h_dim,
+                                                         edge_in_dim, edge_h_dim, seq_in=False,
+                                                         num_layers=gvp_num_layers)
+        
+        dim_mlp = node_h_dim[0]
+
+
+
+        # Input projection to reduce dimensionality before LSTM
+        self.input_projection = nn.Linear(dim_mlp, hidden_dim)
+        
+        # Bidirectional LSTM for temporal encoding
+        self.lstm = nn.LSTM(
+            input_size=hidden_dim,
+            hidden_size=output_dim,
+            num_layers=lstm_layers,
+            batch_first=True,
+            bidirectional=True,
+            dropout=dropout_rate if lstm_layers > 1 else 0
+        )
+        
+        # LSTM output dimension (bidirectional doubles the size)
+        lstm_output_dim = output_dim * 2
+        
+        # Attention mechanism
+        self.attention = TemporalAttention(lstm_output_dim)
+        
+        # Batch normalization and dropout
+        self.batch_norm = nn.BatchNorm1d(hidden_dim)
+        self.dropout = nn.Dropout(dropout_rate)
+        
+        # Final projection dimension after attention
+        proj_dim = lstm_output_dim
+        
+        # Projectors for protein and residue level representations
+        self.projectors_protein = MoBYMLP(
+            in_dim=proj_dim, 
+            inner_dim=protein_inner_dim, 
+            out_dim=protein_out_dim,
+            num_layers=protein_num_projector
+        )
+
+        self.projectors_residue = MoBYMLP(
+            in_dim=proj_dim, 
+            inner_dim=residue_inner_dim, 
+            out_dim=residue_out_dim,
+            num_layers=residue_num_projector
+        )
+        
+        # Fine-tuning control
+        if hasattr(configs.model.Geom2vec_tematt_encoder, "fine_tuning") and not configs.model.Geom2vec_tematt_encoder.fine_tuning.enable:
+            for param in self.input_projection.parameters():
+                param.requires_grad = False
+            for param in self.lstm.parameters():
+                param.requires_grad = False
+            for param in self.attention.parameters():
+                param.requires_grad = False
+
+        if hasattr(configs.model.Geom2vec_tematt_encoder, "fine_tuning_projct") and not configs.model.Geom2vec_tematt_encoder.fine_tuning_projct.enable:
+            for param in self.projectors_protein.parameters():
+                param.requires_grad = False
+            for param in self.projectors_residue.parameters():
+                param.requires_grad = False
+
+    def forward(self, graph, return_logits=False, return_embedding=False, return_attention=False):
+        """
+        Forward pass through BiLSTM with attention
+        
+        Args:
+            graph: Tuple of (res_rep, batch_idx)
+            return_logits: Whether to return logits (placeholder)
+            return_embedding: Whether to return intermediate embeddings
+            return_attention: Whether to return attention weights
+        """
+        residue_feature_list=[]
+        for gt in graph:
+            nodes = (graph.node_s, graph.node_v)
+            edges = (graph.edge_s, graph.edge_v)
+            residue_feature_embedding = self.backbone(nodes, graph.edge_index, edges,
+                                                      seq=None)
+            graph_feature_embedding = global_mean_pool(residue_feature_embedding, graph.batch)
+            residue_feature_list.append(residue_feature_embedding)
+
+        stacked = torch.stack(residue_feature_list, dim=0)
+        # Step 2: Permute to [M, T, dim]
+        res_rep = stacked.permute(1, 0, 2)
+
+
+        if return_logits:
+            print("Logits mode not implemented for BiLSTM version")
+            return None
+        
+        # res_rep = graph[0]  # [sum_n_residue, T, 512]
+        batch_idx = gt.batch  # [sum_n_residue]
+        
+        # Input projection
+        x = self.input_projection(res_rep)  # [sum_n_residue, T, hidden_dim]
+        x = self.batch_norm(x.transpose(1, 2)).transpose(1, 2)  # Apply batch norm across feature dim
+        x = self.dropout(x)
+        
+        # BiLSTM encoding
+        lstm_output, (hidden, cell) = self.lstm(x)  # [sum_n_residue, T, lstm_output_dim]
+        
+        # Apply attention mechanism
+        attended_output, attention_weights = self.attention(lstm_output)  # [sum_n_residue, lstm_output_dim]
+        
+        # Residue-level representation (after attention)
+        res_rep_final = attended_output  # [sum_n_residue, lstm_output_dim]
+        
+        # Protein-level representation (graph pooling)
+        protein_level_rep = scatter_mean(res_rep_final, batch_idx, dim=0)  # [B, lstm_output_dim]
+        
+        # Apply projectors
+        graph_feature = self.projectors_protein(protein_level_rep)  # [B, protein_out_dim]
+        residue_feature = self.projectors_residue(res_rep_final)  # [sum_n_residue, residue_out_dim]
+        
+        if return_embedding and return_attention:
+            return graph_feature, residue_feature, protein_level_rep, res_rep_final, attention_weights
+        elif return_embedding:
+            return graph_feature, residue_feature, protein_level_rep, res_rep_final
+        elif return_attention:
+            return graph_feature, residue_feature, attention_weights
+        else:
+            return graph_feature, residue_feature
+
 class VIVIT(nn.Module):  # embedding table is fixed
     def __init__(self, vivit_pretrain, logging,
                  accelerator,
@@ -1663,6 +1830,7 @@ def prepare_models(logging, configs, accelerator):
         model_MD = VIVIT(configs.model.MD_encoder.model_name,
                      accelerator=accelerator,
                      residue_inner_dim=configs.model.MD_encoder.residue_inner_dim,
+                     protein_inner_dim=configs.model.MD_encoder.protein_inner_dim,
                      residue_out_dim=configs.model.residue_out_dim,
                      protein_out_dim=configs.model.protein_out_dim,
                      residue_num_projector=configs.model.residue_num_projector,

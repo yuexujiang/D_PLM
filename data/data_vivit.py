@@ -34,14 +34,21 @@ def custom_collate(batch):
     return batched_data
 
 def prepare_replicate(configs, train_repli_path, test_repli_path):
-    samples = prepare_samples(train_repli_path)
+    if configs.model.MD_encoder.meanrep:
+        samples = prepare_samples_meanrep(train_repli_path)
+    else:
+        samples = prepare_samples(train_repli_path)
     total_samples = len(samples)
     val_size = int(total_samples * 0.1)
     test_size = int(total_samples * 0.1)
     train_size = total_samples - val_size - test_size
     train_samples, val_samples, test_samples = random_split(samples, [train_size, val_size, test_size])
 
-    samples_hard = prepare_samples(test_repli_path)
+    # samples_hard = prepare_samples(test_repli_path)
+    if configs.model.MD_encoder.meanrep:
+        samples_hard = prepare_samples_meanrep(test_repli_path)
+    else:
+        samples_hard = prepare_samples(test_repli_path)
     hard_num = len(samples_hard)
     val_size = int(hard_num * 0.5)
     test_size = hard_num - val_size
@@ -99,6 +106,16 @@ def prepare_samples(datapath):
     for file_name in os.listdir(datapath):
         file_path = os.path.abspath(os.path.join(datapath, file_name))
         pid, seq, rep = load_h5(file_path)
+        samples.append((pid, seq, rep))
+    
+    return samples
+
+def prepare_samples_meanrep(datapath):
+    samples=[]
+    for file_name in os.listdir(datapath):
+        file_path = os.path.abspath(os.path.join(datapath, file_name))
+        pid, seq, rep = load_h5(file_path)
+        rep = rep[:768]
         samples.append((pid, seq, rep))
     
     return samples

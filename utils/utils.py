@@ -261,6 +261,52 @@ def load_checkpoints(simclr, configs, optimizer_seq,optimizer_struct,scheduler_s
 
     return simclr,start_step,best_score
 
+def load_checkpoints_seq(simclr, configs, optimizer_seq,optimizer_struct,scheduler_seq,scheduler_struct,
+                     logging,resume_path,restart_optimizer=False):
+    start_step=0
+    best_score = None
+    assert os.path.exists(resume_path), (f'resume_path not exits')
+    checkpoint = torch.load(resume_path)  # , map_location=lambda storage, loc: storage)
+    print(f"load checkpoints from {resume_path}")
+    logging.info(f"load checkpoints from {resume_path}")
+    
+    
+    if "state_dict1" in checkpoint: 
+        # to load old checkpoints that saved adapter_layer_dict as adapter_layer.
+        from collections import OrderedDict
+        if np.sum(["adapter_layer_dict" in key for key in checkpoint[
+            'state_dict1'].keys()]) == 0:  # using old checkpoints, need to rename the adapter_layer into adapter_layer_dict.adapter_0
+            new_ordered_dict = OrderedDict()
+            for key, value in checkpoint['state_dict1'].items():
+                if "adapter_layer_dict" not in key:
+                    new_key = key.replace('adapter_layer', 'adapter_layer_dict.adapter_0')
+                    new_ordered_dict[new_key] = value
+                else:
+                    new_ordered_dict[key] = value
+            
+            simclr.model_seq.load_state_dict(new_ordered_dict)
+        else:  # new checkpoints with new code, that can be loaded directly.
+            simclr.model_seq.load_state_dict(checkpoint['state_dict1'])
+    
+    if 'step' in checkpoint:
+        if not restart_optimizer:
+            if 'optimizer_struct' in checkpoint and "scheduler_struct" in checkpoint:
+                optimizer_struct.load_state_dict(checkpoint['optimizer_struct'])
+                logging.info('optimizer_struct is loaded to resume training!')
+                scheduler_struct.load_state_dict(checkpoint['scheduler_struct'])
+                logging.info('scheduler_struct is loaded to resume training!')
+            if 'optimizer_seq' in checkpoint and 'scheduler_seq' in checkpoint:
+                optimizer_seq.load_state_dict(checkpoint['optimizer_seq'])
+                logging.info('optimizer_seq is loaded to resume training!')
+                scheduler_seq.load_state_dict(checkpoint['scheduler_seq'])
+                logging.info('scheduler_seq is loaded to resume training!')
+            
+            start_step = checkpoint['step'] + 1
+            if 'best_score' in checkpoint:
+                best_score = checkpoint['best_score']
+
+    return simclr,start_step,best_score
+
 def load_checkpoints_md(simclr, configs,  
                         optimizer_seq, optimizer_x, scheduler_seq, scheduler_x,
                         logging, resume_path, restart_optimizer=False):
