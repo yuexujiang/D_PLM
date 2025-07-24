@@ -305,7 +305,7 @@ def load_checkpoints_seq(simclr, configs, optimizer_seq,optimizer_struct,schedul
             if 'best_score' in checkpoint:
                 best_score = checkpoint['best_score']
 
-    return simclr,start_step,best_score
+    return simclr,start_step
 
 def load_checkpoints_md(simclr, configs,  
                         optimizer_seq, optimizer_x, scheduler_seq, scheduler_x,
