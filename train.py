@@ -15,7 +15,7 @@ load_configs, test_gpu_cuda, prepare_saving_dir, save_best_checkpoints
 from utils.utils import get_logging, prepare_tensorboard
 from utils.utils import accuracy, residue_batch_sample
 from utils.evaluation import evaluate_with_deaminase, evaluate_with_kinase, evaluate_with_cath_more, \
-                             evaluate_with_deaminase_md, evaluate_with_kinase_md, evaluate_with_cath_more_md
+                             evaluate_with_deaminase_md, evaluate_with_kinase_md, evaluate_with_cath_more_md, test_DMS
 from utils.cath_with_struct import evaluate_with_cath_more_struct
 
 
@@ -596,6 +596,7 @@ def training_loop_MD(simclr, start_step, train_loader, val_loader, test_loader, 
     """
     best_val_loss = np.inf
     best_val_graph_loss = np.inf
+    best_val_dms_corr = 0.0
     while True:
         epoch_num += 1
         if accelerator.is_main_process:
@@ -679,6 +680,12 @@ def training_loop_MD(simclr, start_step, train_loader, val_loader, test_loader, 
                                     loss=loss, bsz=bsz, train_writer=train_writer,valid_writer=valid_writer,
                                     masked_lm_data_collator=masked_lm_data_collator, logging=logging,
                                     accelerator=accelerator)
+                    
+                    val_DMS_corr = test_DMS(simclr.model_seq.esm2, simclr.model_seq.alphabet)
+                    best_val_dms_corr = save_best_checkpoints(accelerator.unwrap_model(optimizer_x),
+                                     accelerator.unwrap_model(optimizer_seq),
+                                     result_path, accelerator.unwrap_model(simclr), n_steps, logging, epoch_num,
+                                     best_val_dms_corr, val_DMS_corr, 'best_val_dms_corr', direction='high')
                     
                     best_val_loss = save_best_checkpoints(accelerator.unwrap_model(optimizer_x),
                                      accelerator.unwrap_model(optimizer_seq),

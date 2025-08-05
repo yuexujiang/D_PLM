@@ -357,22 +357,37 @@ def save_checkpoints(optimizer_x, optimizer_seq, result_path, simclr, n_steps, l
     logging.info(f"Model checkpoint and metadata have been saved at {save_path}")
 
 def save_best_checkpoints(optimizer_x, optimizer_seq, result_path, simclr, n_steps, 
-                          logging, epoch, best_loss, current_loss, best_cptfile):
+                          logging, epoch, best_loss, current_loss, best_cptfile, direction='low'):
     checkpoint_name = f'checkpoint_{best_cptfile}.pth'
     save_path = os.path.join(result_path, 'checkpoints', checkpoint_name)
-    if current_loss<best_loss:
-        save_checkpoint({
-            'epoch': epoch,
-            'step': n_steps,
-            'state_dict1': simclr.model_seq.state_dict(),
-            'state_x': simclr.model_x.state_dict(),
-            'optimizer_x': optimizer_x.state_dict(),
-            'optimizer_seq': optimizer_seq.state_dict(),
-        }, is_best=False, filename=save_path)
-        logging.info(f"Model checkpoint and metadata have been saved at {save_path}")
-        return current_loss
+    if direction=='high':
+        if current_loss>best_loss:
+            save_checkpoint({
+                'epoch': epoch,
+                'step': n_steps,
+                'state_dict1': simclr.model_seq.state_dict(),
+                'state_x': simclr.model_x.state_dict(),
+                'optimizer_x': optimizer_x.state_dict(),
+                'optimizer_seq': optimizer_seq.state_dict(),
+            }, is_best=False, filename=save_path)
+            logging.info(f"Model checkpoint and metadata have been saved at {save_path}")
+            return current_loss
+        else:
+            return best_loss
     else:
-        return best_loss
+        if current_loss<best_loss:
+            save_checkpoint({
+                'epoch': epoch,
+                'step': n_steps,
+                'state_dict1': simclr.model_seq.state_dict(),
+                'state_x': simclr.model_x.state_dict(),
+                'optimizer_x': optimizer_x.state_dict(),
+                'optimizer_seq': optimizer_seq.state_dict(),
+            }, is_best=False, filename=save_path)
+            logging.info(f"Model checkpoint and metadata have been saved at {save_path}")
+            return current_loss
+        else:
+            return best_loss
 
 def save_struct_checkpoints(optimizer_struct, result_path, model, n_steps, logging, epoch,checkpoint_name=None):
     if checkpoint_name is None:

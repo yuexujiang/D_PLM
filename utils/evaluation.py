@@ -23,6 +23,7 @@ import math
 from collections import OrderedDict
 from inspect import signature
 from sklearn.metrics import silhouette_score
+from tqdm import tqdm
 
 
 def get_embedding(embed_dim, num_embeddings):
@@ -911,6 +912,153 @@ def test_evaluate_allcases():
         f"step:{n_iter}\tdigit_num_1_ARI:{scores_cath[2]}\tdigit_num_2_ARI:{scores_cath[5]}\tdigit_num_3_ARI:{scores_cath[8]}")
     print(f"step: {n_iter}\tdeaminase_score:{scores_deaminase[0]}({scores_deaminase[1]}) ARI:{scores_deaminase[2]}")
     print(f"step: {n_iter}\tkinase_score:{scores_kinase[0]}({scores_kinase[1]}) ARI:{scores_kinase[2]}")
+
+
+def compute_repdiff(row, sequence, model, alphabet, offset_idx,wt_representation,mode="whole",similarity="correlation"):
+    if ":" not in row:
+       base = row[1:-1]
+       if len(base)==0:
+        return np.nan
+       
+       wt, idx, mt = row[0], int(row[1:-1]) - offset_idx, row[-1]
+       if idx>=len(sequence):
+           return np.nan
+       
+       assert sequence[idx] == wt, "The listed wildtype does not match the provided sequence"
+       # modify the sequence
+       sequence = sequence[:idx] + mt + sequence[(idx + 1) :]
+    else:
+        for row_i in row.split(":"):
+            base = row[1:-1]
+            if len(base)==0:
+                return np.nan
+            
+            wt, idx, mt = row_i[0], int(row_i[1:-1]) - offset_idx, row_i[-1]
+            if idx>=len(sequence):
+               return np.nan
+            
+            assert sequence[idx] == wt, "The listed wildtype does not match the provided sequence"
+            # modify the sequence
+            sequence = sequence[:idx] + mt + sequence[(idx + 1) :]
+     
+    if "_" in sequence:
+        return np.nan #skip all delition and insertion
+    
+    # encode the sequence
+    data = [
+        ("protein1", sequence),
+    ]
+    
+    batch_converter = alphabet.get_batch_converter()
+    
+    batch_labels, batch_strs, batch_tokens = batch_converter(data)
+    
+    # compute probabilities at each position
+    mt_representation = model(batch_tokens.cuda(),repr_layers=[model.num_layers])["representations"][model.num_layers].squeeze(0)
+    #print(mt_representation.shape)
+    if mode=="whole":
+       #mask = (mt_representation != alphabet.padding_idx)  # use this in v2 training
+       #denom = torch.sum(mask, -1, keepdim=True)
+       #mt_representation = torch.sum(mt_representation * mask, dim=1) / denom  # remove padding
+       #wt_representation = torch.sum(wt_representation * mask, dim=1) / denom
+       mt_representation = torch.sum(mt_representation,dim=0)
+       wt_representation = torch.sum(wt_representation,dim=0)
+       
+    elif mode =="marginals":   #add BOS at beginning
+        mt_representation = mt_representation[idx+1:idx+2].squeeze(0)
+        wt_representation = wt_representation[idx+1:idx+2].squeeze(0)
+    elif mode == "RLA":
+        if  similarity == "cosine":    
+           score = (mt_representation.unsqueeze(0).unsqueeze(2) @ wt_representation.unsqueeze(0).unsqueeze(-1)).squeeze(-1).squeeze(-1).squeeze(0)
+           return (score).mean(0).item()
+        elif similarity == "euclidean_distance":
+           score = np.linalg.norm((mt_representation-wt_representation).to('cpu').detach().numpy(),axis=1)
+           return np.log(np.mean(score))*-1
+        elif similarity == "mse":
+           score = np.mean(((mt_representation - wt_representation).to('cpu').detach().numpy()) ** 2)
+           return np.log(score)*-1
+    
+    #print(mt_representation.shape)
+    #print(wt_representation.shape)
+    if similarity == "cosine":
+       score = F.cosine_similarity(mt_representation.unsqueeze(0), wt_representation.unsqueeze(0))
+    elif similarity == "euclidean_distance":
+       score = torch.dist(mt_representation, wt_representation, p=2)
+    
+    elif similarity == "correlation":
+       # Stack the tensors into a 2D tensor
+       stacked_tensors = torch.stack((mt_representation, wt_representation))
+       # Calculate the Pearson correlation coefficient matrix
+       correlation_matrix = torch.corrcoef(stacked_tensors)
+       score = correlation_matrix[0, 1]
+    
+    return np.log(score.item())
+
+def test_DMS(seq_model, alphabet):
+    # parser = create_parser()
+    # args = parser.parse_args()
+    # args.model,args.alphabet = load_model(args)
+    outputfilename = os.path.join("/cluster/pixstor/xudong-lab/yuexu/D_PLM/ESM_1v_data/results/",'ESM-1v_data_summary_start_end_seq_splm_esm2.csv')
+    dfdata=pd.read_csv(outputfilename)
+    tqdm.pandas()
+    for index, row in dfdata.iterrows():
+      #for index, row in df.iloc[index:].iterrows():
+        wt_seq = row['WT seq']
+        if wt_seq is np.nan:
+            continue
+        
+        filekey = row['Dataset_file']
+        ### just for mutation effect to stability
+        # print(args.filekey)
+        if not filekey == 'PTEN_HUMAN_Fowler2018':
+        # if not filekey == 'TPMT_HUMAN_Fowler2018' and not filekey == 'PTEN_HUMAN_Fowler2018':
+            # if args.scoring_strategy in ["wt-mt-whole","wt-mt-RLA","wt-mt-marginals"]:
+            #    df.loc[index,args.modelname+"-"+args.scoring_strategy+"-"+args.similarity] = 0
+            # else:
+            #     df.loc[index,args.modelname+"-"+args.scoring_strategy] = 0
+            continue
+        path_test = os.path.join("/cluster/pixstor/xudong-lab/yuexu/D_PLM/ESM_1v_data/data_wedownloaded/41 mutation dataset/ESM-1v-41/test",row['Dataset_file']+".csv")
+        path_val = os.path.join("/cluster/pixstor/xudong-lab/yuexu/D_PLM/ESM_1v_data/data_wedownloaded/41 mutation dataset/ESM-1v-41/validation",row['Dataset_file']+".csv")
+        if os.path.exists(path_test):
+           dms_input = path_test
+        else:
+           dms_input = path_val
+        
+        sequence = str(wt_seq)
+        offset_idx = int(row['offset_idx'])
+        ref_name = row['Name(s) in Reference']
+        # result = main(args)
+
+        df = pd.read_csv(dms_input)
+        batch_converter = alphabet.get_batch_converter()
+        data = [
+        ("protein1", sequence),
+        ]
+        batch_labels, batch_strs, batch_tokens = batch_converter(data)
+        mode = "RLA"
+        tqdm.pandas()
+        with torch.inference_mode():
+            wt_representation = seq_model(batch_tokens.cuda(),repr_layers=[seq_model.num_layers])["representations"][seq_model.num_layers]
+        
+        wt_representation = wt_representation.squeeze(0) #only one sequence a time
+        mutation_col = "mutant"
+        similarity = "euclidean_distance"
+        df['modelname'] = df.progress_apply(
+            lambda row: compute_repdiff(
+                row[mutation_col],
+                sequence,
+                seq_model,
+                alphabet,
+                offset_idx,
+                wt_representation,
+                mode=mode,
+                similarity=similarity
+            ),
+            axis=1,
+        )
+        esm_rla_corr = df[ref_name].corr(df['modelname'],method = 'pearson')
+        esm_rla_spearmn = df[ref_name].corr(df['modelname'],method='spearman')  
+    return esm_rla_spearmn
 
 
 # test_evaluate_allcases()

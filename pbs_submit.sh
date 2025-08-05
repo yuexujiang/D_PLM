@@ -248,7 +248,7 @@ task='v2_0'
 folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
 num=0
 split_num=5
-outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_vivit_data'
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_Atlas_v2added'
 sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
      -J ${task} \
      data_process.pbs
@@ -257,7 +257,7 @@ task='v2_1'
 folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
 num=1
 split_num=5
-outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_vivit_data'
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_Atlas_v2added'
 sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
      -J ${task} \
      data_process.pbs
@@ -266,7 +266,7 @@ task='v2_2'
 folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
 num=2
 split_num=5
-outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_vivit_data'
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_Atlas_v2added'
 sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
      -J ${task} \
      data_process.pbs
@@ -275,7 +275,7 @@ task='v2_3'
 folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
 num=3
 split_num=5
-outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_vivit_data'
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_Atlas_v2added'
 sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
      -J ${task} \
      data_process.pbs
@@ -284,7 +284,7 @@ task='v2_4'
 folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
 num=4
 split_num=5
-outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_vivit_data'
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_Atlas_v2added'
 sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
      -J ${task} \
      data_process.pbs
@@ -422,6 +422,34 @@ result_path='./results/vivit_hyper1/'
 sbatch --export=config_path=$config_path,result_path=$result_path, \
      -J ${task} \
      run_yjm85.sh
+
+task="vivit_big"
+config_path='./configs_hell/gvp_v2/config_vivit_resize_big.yaml'
+result_path='./results/vivit_big/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
+
+task="vivit_big2"
+config_path='./configs_hell/gvp_v2/config_vivit_resize_big2.yaml'
+result_path='./results/vivit_big2/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
+
+task="vivit_resize"
+config_path='./configs_hell/gvp_v2/config_vivit_resize.yaml'
+result_path='./results/vivit_resize2/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
+
+task="vivit"
+config_path='./configs_hell/gvp_v2/config.yaml'
+result_path='./results/vivit/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
 #####################
 #need to submit in sbatch, need long time
 task="ESM1v_test"
@@ -516,6 +544,39 @@ sbatch --export=model_location=$model_location,config_path=$config_path,scoring_
 task="vivit_resize"
 model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_resize/checkpoints/checkpoint_0004950.pth'
 config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_resize/config_vivit_resize.yaml'
+scoring_strategy='wt-mt-RLA' #"mask-marginals
+sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
+       -J ${task} \
+       ./ESM_1v_data/mutation_effect_ESM1v.pbs
+
+task="vivit_meanrep"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_meanrep/checkpoints/checkpoint_best_val_whole_loss.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_meanrep/config_vivit_meanrep.yaml'
+scoring_strategy='wt-mt-RLA' #"mask-marginals
+sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
+       -J ${task} \
+       ./ESM_1v_data/mutation_effect_ESM1v.pbs
+
+
+task="vivit_splm"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_splm/checkpoints/checkpoint_best_val_whole_loss.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_splm/config_vivit_splm.yaml'
+scoring_strategy='wt-mt-RLA' #"mask-marginals
+sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
+       -J ${task} \
+       ./ESM_1v_data/mutation_effect_ESM1v.pbs
+
+task="vivit_hyper"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_hyper1/checkpoints/checkpoint_best_val_whole_loss.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_hyper1/config_vivit_hyper1.yaml'
+scoring_strategy='wt-mt-RLA' #"mask-marginals
+sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
+       -J ${task} \
+       ./ESM_1v_data/mutation_effect_ESM1v.pbs
+
+task="vivit_big2"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_big2/checkpoints/checkpoint_best_val_whole_loss.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_big2/config_vivit_resize_big2.yaml'
 scoring_strategy='wt-mt-RLA' #"mask-marginals
 sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
        -J ${task} \
