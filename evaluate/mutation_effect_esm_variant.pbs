@@ -22,6 +22,6 @@ export HF_HOME=/cluster/pixstor/xudong-lab/yuexu/transformers_cache/
 
 
 
-python -m evaluate.predict_splm --model-location $model_location --config-path $config_path --scoring-strategy $scoring_strategy
 
+python -m evaluate.predict_esm_variant --model-location $model_location --config-path $config_path --scoring-strategy $scoring_strategy
 

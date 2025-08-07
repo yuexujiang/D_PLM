@@ -585,7 +585,7 @@ sbatch --export=model_location=$model_location,config_path=$config_path,scoring_
 task="vivit"
 model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit/checkpoints/checkpoint_best_val_dms_corr.pth'
 config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit/config.yaml'
-scoring_strategy='wt-mt-RLA' #"mask-marginals
+scoring_strategy='mask-marginals' #'mask-marginals' 'wt-mt-RLA'
 sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
        -J ${task} \
        ./ESM_1v_data/mutation_effect_ESM1v.pbs
@@ -593,7 +593,23 @@ sbatch --export=model_location=$model_location,config_path=$config_path,scoring_
 task="vivit_resize"
 model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_resize2/checkpoints/checkpoint_best_val_dms_corr.pth'
 config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_resize2/config_vivit_resize.yaml'
-scoring_strategy='wt-mt-RLA' #"mask-marginals
+scoring_strategy='mask-marginals' #'mask-marginals' 'wt-mt-RLA'
+sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
+       -J ${task} \
+       ./ESM_1v_data/mutation_effect_ESM1v.pbs
+
+task="vivit_variant"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit/checkpoints/checkpoint_best_val_dms_corr.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit/config.yaml'
+scoring_strategy='mask-marginals' #'mask-marginals' 'wt-mt-RLA'
+sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
+       -J ${task} \
+       ./ESM_1v_data/mutation_effect_ESM1v.pbs
+
+task="vivit_resize_variant"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_resize2/checkpoints/checkpoint_best_val_dms_corr.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_resize2/config_vivit_resize.yaml'
+scoring_strategy='mask-marginals' #'mask-marginals' 'wt-mt-RLA'
 sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
        -J ${task} \
        ./ESM_1v_data/mutation_effect_ESM1v.pbs
