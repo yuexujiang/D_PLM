@@ -335,11 +335,15 @@ def load_checkpoints_md(simclr, configs,
                 logging.info('optimizer_seq is loaded to resume training!')
                 scheduler_seq.load_state_dict(checkpoint['scheduler_seq'])
                 logging.info('scheduler_seq is loaded to resume training!')
-        
-        start_step = checkpoint['step'] + 1
 
-    if 'best_score' in checkpoint:
-        best_score = checkpoint['best_score']
+            start_step = checkpoint['step'] + 1
+            if 'best_score' in checkpoint:
+                best_score = checkpoint['best_score']
+        
+    #     start_step = checkpoint['step'] + 1
+
+    # if 'best_score' in checkpoint:
+    #     best_score = checkpoint['best_score']
     return simclr,start_step,best_score
 
 def save_checkpoints(optimizer_x, optimizer_seq, result_path, simclr, n_steps, logging, epoch):

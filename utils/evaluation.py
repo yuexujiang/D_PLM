@@ -994,7 +994,7 @@ def compute_repdiff(row, sequence, model, alphabet, offset_idx,wt_representation
     
     return np.log(score.item())
 
-def test_DMS(seq_model, alphabet):
+def test_DMS(seq_model, alphabet, n_steps, logging):
     # parser = create_parser()
     # args = parser.parse_args()
     # args.model,args.alphabet = load_model(args)
@@ -1058,6 +1058,11 @@ def test_DMS(seq_model, alphabet):
         )
         esm_rla_corr = df[ref_name].corr(df['modelname'],method = 'pearson')
         esm_rla_spearmn = df[ref_name].corr(df['modelname'],method='spearman')  
+    
+    
+    # logging.info(f'evaluation - step {n_steps}')
+    logging.info(f"step:{n_steps} esm_rla_spearmn:{esm_rla_spearmn:.4f}")
+
     return esm_rla_spearmn
 
 
