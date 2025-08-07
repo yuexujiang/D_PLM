@@ -1037,7 +1037,7 @@ def test_DMS(seq_model, alphabet):
         batch_labels, batch_strs, batch_tokens = batch_converter(data)
         mode = "RLA"
         tqdm.pandas()
-        with torch.inference_mode():
+        with torch.no_grad():
             wt_representation = seq_model(batch_tokens.cuda(),repr_layers=[seq_model.num_layers])["representations"][seq_model.num_layers]
         
         wt_representation = wt_representation.squeeze(0) #only one sequence a time

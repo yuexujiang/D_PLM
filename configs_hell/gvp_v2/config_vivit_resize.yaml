@@ -18,6 +18,7 @@ model:
 
   MD_encoder:
     model_name: google/vivit-b-16x2-kinetics400
+    meanrep: False
     residue_inner_dim: 1024
     protein_inner_dim: 4096
     dim_mlp: 2304
