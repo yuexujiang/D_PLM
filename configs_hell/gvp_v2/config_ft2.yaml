@@ -31,18 +31,17 @@ model:
     residue_inner_dim: 1024
     protein_inner_dim: 1024
     fine_tuning:
-      enable: False
-      unfix_last_layer: 4
+      enable: True
+      unfix_last_layer: 3
     adapter_h:
       enable: False
       num_end_adapter_layers: 16
       module_type: "MLP1"
     lora:
-      enable: True
-      r: 2 #8
-      alpha: 8 #32
+      enable: False
+      r: 8
+      alpha: 32
       dropout: 0.05
-      esm_num_end_lora: 16
       resume:
         enable: False
         checkpoint_path: path/to/checkpoints.pth
@@ -88,12 +87,12 @@ train_settings:
   num_steps: 5000 #10000000
   shuffle: True
   mixed_precision: "fp16" # no, fp16, bf16, fp8
-  batch_size: 32
+  batch_size: 32 #64
   residue_batch_size: 2000
   num_workers: 1
   gradient_accumulation: 1
   n_views: 2
-  temperature: 0.05
+  temperature: 0.2 #0.05
   plddt_weight: True
   plddt_weight_mode: "all" #"positive" "all"
 

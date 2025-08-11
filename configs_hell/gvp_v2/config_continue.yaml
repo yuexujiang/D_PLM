@@ -1,17 +1,17 @@
 fix_seed: 0
-checkpoints_every: 500
+checkpoints_every: 1000
 tensorboard_log: True
 result_path: ./results/test
 # HF_cache_path: ./HF_cashe_path
 
 resume:
-  resume: False
-  resume_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/results/test2/checkpoints/checkpoint_0030000.pth
+  resume: True
+  resume_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit/checkpoints/checkpoint_best_val_dms_corr.pth
   restart_optimizer: True
 
 model:
   residue_out_dim: 64
-  protein_out_dim: 512
+  protein_out_dim: 256
   residue_num_projector: 1
   protein_num_projector: 2
   X_module: MD #structure
@@ -19,7 +19,7 @@ model:
   MD_encoder:
     model_name: google/vivit-b-16x2-kinetics400
     residue_inner_dim: 1024
-    protein_inner_dim: 1024
+    protein_inner_dim: 4096
     dim_mlp: 768
     fine_tuning:
          enable: False
@@ -29,20 +29,19 @@ model:
     model_name:  esm2_t33_650M_UR50D # esm2_t33_650M_UR50D, esm2_t30_150M_UR50D, esm2_t12_35M_UR50D, esm2_t6_8M_UR50D
     max_length: 512
     residue_inner_dim: 1024
-    protein_inner_dim: 1024
+    protein_inner_dim: 4096
     fine_tuning:
       enable: False
       unfix_last_layer: 4
     adapter_h:
-      enable: False
-      num_end_adapter_layers: 16
+      enable: True
+      num_end_adapter_layers: 12
       module_type: "MLP1"
     lora:
-      enable: True
-      r: 2 #8
-      alpha: 8 #32
+      enable: False
+      r: 8
+      alpha: 32
       dropout: 0.05
-      esm_num_end_lora: 16
       resume:
         enable: False
         checkpoint_path: path/to/checkpoints.pth
@@ -88,7 +87,7 @@ train_settings:
   num_steps: 5000 #10000000
   shuffle: True
   mixed_precision: "fp16" # no, fp16, bf16, fp8
-  batch_size: 32
+  batch_size: 64
   residue_batch_size: 2000
   num_workers: 1
   gradient_accumulation: 1

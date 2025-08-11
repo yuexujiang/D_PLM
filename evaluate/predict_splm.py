@@ -541,7 +541,14 @@ if __name__ == "__main__":
         args.filekey = row['Dataset_file']
         ### just for mutation effect to stability
         print(args.filekey)
-        if not args.filekey == 'TPMT_HUMAN_Fowler2018' and not args.filekey == 'PTEN_HUMAN_Fowler2018':
+        if not args.filekey == 'TPMT_HUMAN_Fowler2018' and not args.filekey == 'PTEN_HUMAN_Fowler2018' \
+            and not args.filekey == 'BG_STRSQ_hmmerbit' \
+                and not args.filekey == 'DLG4_RAT_Ranganathan2012' \
+                    and not args.filekey == 'RL401_YEAST_Bolon2014' \
+                        and not args.filekey == 'UBE4B_MOUSE_Klevit2013-singles' \
+                            and not args.filekey == 'YAP1_HUMAN_Fields2012-singles' \
+                                and not args.filekey == 'AMIE_PSEAE_Whitehead' \
+                                    and not args.filekey == 'RASH_HUMAN_Kuriyan':
             # if args.scoring_strategy in ["wt-mt-whole","wt-mt-RLA","wt-mt-marginals"]:
             #    df.loc[index,args.modelname+"-"+args.scoring_strategy+"-"+args.similarity] = 0
             # else:

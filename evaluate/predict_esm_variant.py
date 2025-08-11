@@ -172,6 +172,9 @@ def label_row(row, sequence, token_probs, alphabet, offset_idx):
        if idx>=len(sequence):
            return np.nan
        
+       print(idx)
+       print(sequence[idx])
+       print(wt)
        assert sequence[idx] == wt, "The listed wildtype does not match the provided sequence"
        if "_" in wt or "_" in mt:
             return np.nan
@@ -515,7 +518,7 @@ if __name__ == "__main__":
       pathlib.Path(args.dms_output).mkdir(parents=True, exist_ok=True)
       args.logging = get_logging(args.dms_output)
       
-      outputfilename = os.path.join("/cluster/pixstor/xudong-lab/yuexu/D_PLM/evaluate/",'data_template.xlsx')
+      outputfilename = os.path.join("/cluster/pixstor/xudong-lab/yuexu/D_PLM/evaluate/",'data_template.csv')
       import shutil
       
       if os.path.exists(outputfilename):
@@ -550,7 +553,11 @@ if __name__ == "__main__":
         path_test = os.path.join("/cluster/pixstor/xudong-lab/yuexu/D_PLM/esm-variants-main/esm-variants-main/benchmarks/dms_assays/dms_assays/",row['Dataset_file']+".csv")
         # path_val = os.path.join("/cluster/pixstor/xudong-lab/yuexu/D_PLM/ESM_1v_data/data_wedownloaded/41 mutation dataset/ESM-1v-41/validation",row['Dataset_file']+".csv")
         if os.path.exists(path_test):
-           args.dms_input = path_test
+            args.dms_input = path_test
+        else:
+            print(f'don not exist file {path_test}')
+            continue
+
         # else:
         #    args.dms_input = path_val
         
