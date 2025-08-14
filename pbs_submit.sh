@@ -499,6 +499,20 @@ result_path='./results/vivit_ft2/'
 sbatch --export=config_path=$config_path,result_path=$result_path, \
      -J ${task} \
      run_yjm85.sh
+
+task="vivit_lora2"
+config_path='./configs_hell/gvp_v2/config_lora2.yaml'
+result_path='./results/vivit_lora2/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
+
+task="vivit"
+config_path='./configs_hell/gvp_v2/config.yaml'
+result_path='./results/vivit_2/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
 #####################
 #need to submit in sbatch, need long time
 task="ESM1v_test"
@@ -662,6 +676,22 @@ scoring_strategy='mask-marginals' #'mask-marginals' 'wt-mt-RLA'
 sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
        -J ${task} \
        ./evaluate/mutation_effect_esm_variant.pbs
+
+task="vivit_lora_eval"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_lora/checkpoints/checkpoint_best_val_dms_corr.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_lora/config5.yaml'
+scoring_strategy='wt-mt-RLA' #'mask-marginals' 'wt-mt-RLA'
+sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
+       -J ${task} \
+       ./evaluate/mutation_effect_ESM1v.pbs
+
+task="vivit_ft_eval"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_ft2/checkpoints/checkpoint_best_val_dms_corr.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_ft2/config_ft2.yaml'
+scoring_strategy='wt-mt-RLA' #'mask-marginals' 'wt-mt-RLA'
+sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
+       -J ${task} \
+       ./evaluate/mutation_effect_ESM1v.pbs
 #####################################################
 task="v2"
 folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'

@@ -151,7 +151,7 @@ def gogogo(args):
     args.model,args.alphabet = load_model(args)
     #
     datapath = '/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_test/'
-    datapath_MDfeature = '/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_test/'
+    datapath_MDfeature = '/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_test_R1/'
     processed_list=[]
     rep_norm_list=[]
     rmsf_list=[]
@@ -176,12 +176,12 @@ def gogogo(args):
         r1 = df["RMSF_R1"].values
         rep_norm_list.extend(residue_norms)
         rmsf_list.extend(r1)
-        r2 = df["RMSF_R2"].values
-        rep_norm_list.extend(residue_norms)
-        rmsf_list.extend(r2)
-        r3 = df["RMSF_R3"].values
-        rep_norm_list.extend(residue_norms)
-        rmsf_list.extend(r3)
+        # r2 = df["RMSF_R2"].values
+        # rep_norm_list.extend(residue_norms)
+        # rmsf_list.extend(r2)
+        # r3 = df["RMSF_R3"].values
+        # rep_norm_list.extend(residue_norms)
+        # rmsf_list.extend(r3)
         # print(r1.shape)
         MDfeature_file_r1 = os.path.join(datapath_MDfeature, f"{file_name[:-3]}.h5")
         if os.path.exists(MDfeature_file_r1):
@@ -225,10 +225,10 @@ if __name__ == "__main__":
     (rep_norm_list, rmsf_list), (rep_dis_list, dccm_list) = gogogo(args)
 
     corr, _ = spearmanr(rep_norm_list, rmsf_list)
-    plot_and_fit(rep_norm_list, rmsf_list, 'rep_norm', 'rmsf', corr, args.output_path, 'rep_norm_rmsf_dplm')
+    plot_and_fit(rep_norm_list, rmsf_list, 'rep_norm', 'rmsf', corr, args.output_path, 'rep_norm_rmsf_lora2')
 
     corr, _ = spearmanr(rep_dis_list, dccm_list)
-    plot_and_fit(rep_dis_list, dccm_list, 'rep_dis', 'dccm', corr, args.output_path, 'rep_dis_dccm_dplm')
+    plot_and_fit(rep_dis_list, dccm_list, 'rep_dis', 'dccm', corr, args.output_path, 'rep_dis_dccm_lora2')
 
     
 
