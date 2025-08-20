@@ -692,6 +692,46 @@ scoring_strategy='wt-mt-RLA' #'mask-marginals' 'wt-mt-RLA'
 sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
        -J ${task} \
        ./evaluate/mutation_effect_ESM1v.pbs
+
+task="vivit_2_eval"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_2/checkpoints/checkpoint_best_val_dms_corr.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_2/config.yaml'
+scoring_strategy='wt-mt-RLA' #'mask-marginals' 'wt-mt-RLA'
+sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
+       -J ${task} \
+       ./evaluate/mutation_effect_ESM1v.pbs
+
+task="vivit_lora2_eval"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_lora2/checkpoints/checkpoint_best_val_dms_corr.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_lora2/config_lora2.yaml'
+scoring_strategy='wt-mt-RLA' #'mask-marginals' 'wt-mt-RLA'
+sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
+       -J ${task} \
+       ./evaluate/mutation_effect_ESM1v.pbs     
+
+task="DCCM"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/DCCM_GNN/checkpoints/checkpoint_0003100.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/DCCM_GNN/config_DCCM_GNN.yaml'
+scoring_strategy='wt-mt-RLA' #"mask-marginals
+sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
+       -J ${task} \
+       ./evaluate/mutation_effect_ESM1v.pbs
+
+task="geom2vec_temcnn"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/geom2vec_temcnn/checkpoints/checkpoint_best_val_whole_loss.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/geom2vec_temcnn/config_geom2vec_temcnn.yaml'
+scoring_strategy='wt-mt-RLA' #"mask-marginals
+sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
+       -J ${task} \
+       ./evaluate/mutation_effect_ESM1v.pbs
+
+task="geom2vec_temlstmatt"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/geom2vec_temlstmatt/checkpoints/checkpoint_best_val_whole_loss.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/geom2vec_temlstmatt/config_geom2vec_temlstmatt.yaml'
+scoring_strategy='wt-mt-RLA' #"mask-marginals
+sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
+       -J ${task} \
+       ./evaluate/mutation_effect_ESM1v.pbs
 #####################################################
 task="v2"
 folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'

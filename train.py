@@ -844,7 +844,7 @@ def evaluation_loop_MD(simclr, val_loader, labels, batch_converter, criterion, c
         valid_writer.add_scalar('n_st_s', val_negsim_struct_seq, n_steps)
         valid_writer.add_scalar('n_s_s', val_negsim_seq_seq, n_steps)
 
-        seq_evaluation_loop_MD(simclr, n_steps, configs, batch_converter, result_path, valid_writer, logging, accelerator)
+        # seq_evaluation_loop_MD(simclr, n_steps, configs, batch_converter, result_path, valid_writer, logging, accelerator)
     
     return loss_val, val_graph_loss
     # return n_steps
