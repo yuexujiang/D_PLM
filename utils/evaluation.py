@@ -994,11 +994,12 @@ def compute_repdiff(row, sequence, model, alphabet, offset_idx,wt_representation
     
     return np.log(score.item())
 
-def test_DMS(seq_model, alphabet, n_steps, logging):
+def test_DMS(configs, seq_model, alphabet, n_steps, logging):
     # parser = create_parser()
     # args = parser.parse_args()
     # args.model,args.alphabet = load_model(args)
-    outputfilename = os.path.join("/cluster/pixstor/xudong-lab/yuexu/D_PLM/ESM_1v_data/results/",'ESM-1v_data_summary_start_end_seq_splm_esm2.csv')
+    # outputfilename = os.path.join("/cluster/pixstor/xudong-lab/yuexu/D_PLM/ESM_1v_data/results/",'ESM-1v_data_summary_start_end_seq_splm_esm2.csv')
+    outputfilename = os.path.join(configs.valid_settings.dms_summary_path)
     dfdata=pd.read_csv(outputfilename)
     tqdm.pandas()
     for index, row in dfdata.iterrows():
@@ -1017,8 +1018,10 @@ def test_DMS(seq_model, alphabet, n_steps, logging):
             # else:
             #     df.loc[index,args.modelname+"-"+args.scoring_strategy] = 0
             continue
-        path_test = os.path.join("/cluster/pixstor/xudong-lab/yuexu/D_PLM/ESM_1v_data/data_wedownloaded/41 mutation dataset/ESM-1v-41/test",row['Dataset_file']+".csv")
-        path_val = os.path.join("/cluster/pixstor/xudong-lab/yuexu/D_PLM/ESM_1v_data/data_wedownloaded/41 mutation dataset/ESM-1v-41/validation",row['Dataset_file']+".csv")
+        # path_test = os.path.join("/cluster/pixstor/xudong-lab/yuexu/D_PLM/ESM_1v_data/data_wedownloaded/41 mutation dataset/ESM-1v-41/test",row['Dataset_file']+".csv")
+        # path_val = os.path.join("/cluster/pixstor/xudong-lab/yuexu/D_PLM/ESM_1v_data/data_wedownloaded/41 mutation dataset/ESM-1v-41/validation",row['Dataset_file']+".csv")
+        path_test = os.path.join(configs.valid_settings.dms_path, 'test', row['Dataset_file']+".csv")
+        path_val = os.path.join(configs.valid_settings.dms_path, 'validation', row['Dataset_file']+".csv")
         if os.path.exists(path_test):
            dms_input = path_test
         else:

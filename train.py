@@ -681,7 +681,7 @@ def training_loop_MD(simclr, start_step, start_dms, start_loss, train_loader, va
                                     masked_lm_data_collator=masked_lm_data_collator, logging=logging,
                                     accelerator=accelerator)
                     
-                    val_DMS_corr = test_DMS(simclr.model_seq.esm2, simclr.model_seq.alphabet, n_steps=n_steps, logging=logging)
+                    val_DMS_corr = test_DMS(configs, simclr.model_seq.esm2, simclr.model_seq.alphabet, n_steps=n_steps, logging=logging)
                     best_val_dms_corr = save_best_checkpoints(accelerator.unwrap_model(optimizer_x),
                                      accelerator.unwrap_model(optimizer_seq),
                                      result_path, accelerator.unwrap_model(simclr), n_steps, logging, epoch_num,
