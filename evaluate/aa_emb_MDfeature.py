@@ -23,6 +23,13 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
+from sklearn.manifold import TSNE
+from sklearn.cluster import KMeans
+from sklearn.metrics import adjusted_rand_score, normalized_mutual_info_score
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+
+
 def load_checkpoints(model,checkpoint_path):
         if checkpoint_path is not None:
             checkpoint = torch.load(checkpoint_path, map_location=lambda storage, loc: storage)
@@ -151,7 +158,7 @@ def gogogo(args):
     args.model,args.alphabet = load_model(args)
     #
     datapath = '/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_test/'
-    datapath_MDfeature = '/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_test_R1/'
+    # datapath_MDfeature = '/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_test_R1/'
     processed_list=[]
     rep_norm_list=[]
     rmsf_list=[]
@@ -183,13 +190,13 @@ def gogogo(args):
         # rep_norm_list.extend(residue_norms)
         # rmsf_list.extend(r3)
         # print(r1.shape)
-        MDfeature_file_r1 = os.path.join(datapath_MDfeature, f"{file_name[:-3]}.h5")
-        if os.path.exists(MDfeature_file_r1):
-            rmsf, dccm, mi, seq, pid = load_h5_file_v2(MDfeature_file_r1)
-            r1 = flatten_upper(distance_matrix)
-            r2 = flatten_upper(1 - np.abs(dccm))  # higher = more correlated motion
-            rep_dis_list.extend(r1)
-            dccm_list.extend(r2)
+        # MDfeature_file_r1 = os.path.join(datapath_MDfeature, f"{file_name[:-3]}.h5")
+        # if os.path.exists(MDfeature_file_r1):
+        #     rmsf, dccm, mi, seq, pid = load_h5_file_v2(MDfeature_file_r1)
+        #     r1 = flatten_upper(distance_matrix)
+        #     r2 = flatten_upper(1 - np.abs(dccm))  # higher = more correlated motion
+        #     rep_dis_list.extend(r1)
+        #     dccm_list.extend(r2)
         #
         # MDfeature_file_r2 = os.path.join(datapath_MDfeature, f"{file_name}_prod_R2_fit.h5")
         # if os.path.exists(MDfeature_file_r2):
@@ -213,22 +220,306 @@ def gogogo(args):
     #
     return (rep_norm_list, rmsf_list), (rep_dis_list, dccm_list)
 
+def B_factor(args):
+    #
+    args.model,args.alphabet = load_model(args)
+    #
+    datapath = '/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_test/'
+    # datapath = '/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
+    processed_list=[]
+    rep_norm_list=[]
+    bf_list=[]
+    for file_name in os.listdir(datapath):
+        print(f"processing...{file_name}")
+        pid="_".join(file_name.split('_')[:2])
+        if pid in processed_list:
+            continue
+        pdb_file = os.path.join("/cluster/pixstor/xudong-lab/yuexu/D_PLM/analysis/", f"{pid}_analysis", f"{pid}.pdb")
+        args.sequence = str(pdb2seq(pdb_file))
+        #
+        seq_emb = main(args) #[seq_l+2, 1280]
+        seq_emb = seq_emb[1:-1]
+        # print(seq_emb.shape)
+        residue_norms = np.linalg.norm(seq_emb.cpu(), axis=1)
+        #
+        bf_file = os.path.join("/cluster/pixstor/xudong-lab/yuexu/D_PLM/analysis/", f"{pid}_analysis", f"{pid}_Bfactor.tsv")
+        df = pd.read_csv(bf_file, sep="\t")
+        r1 = df["Bfactor"].values.astype(np.float32)
+        # rep_norm_list.extend(residue_norms)
+        # bf_list.extend(r1)
+        valid_mask = ~np.isnan(r1)
+        # Apply mask to both arrays
+        filtered_norms = residue_norms[valid_mask]
+        filtered_bf = r1[valid_mask]
+        rep_norm_list.extend(filtered_norms)
+        bf_list.extend(filtered_bf)
+        # r2 = df["RMSF_R2"].values
+        # rep_norm_list.extend(residue_norms)
+        # rmsf_list.extend(r2)
+        # r3 = df["RMSF_R3"].values
+        # rep_norm_list.extend(residue_norms)
+        # rmsf_list.extend(r3)
+        # print(r1.shape)
+    
+    return (rep_norm_list, bf_list)
+
+def plddt(args):
+    #
+    args.model,args.alphabet = load_model(args)
+    #
+    datapath = '/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_test/'
+    # datapath = '/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
+    processed_list=[]
+    rep_norm_list=[]
+    plddt_list=[]
+    for file_name in os.listdir(datapath):
+        print(f"processing...{file_name}")
+        pid="_".join(file_name.split('_')[:2])
+        if pid in processed_list:
+            continue
+        pdb_file = os.path.join("/cluster/pixstor/xudong-lab/yuexu/D_PLM/analysis/", f"{pid}_analysis", f"{pid}.pdb")
+        args.sequence = str(pdb2seq(pdb_file))
+        #
+        seq_emb = main(args) #[seq_l+2, 1280]
+        seq_emb = seq_emb[1:-1]
+        # print(seq_emb.shape)
+        residue_norms = np.linalg.norm(seq_emb.cpu(), axis=1)
+        #
+        plddt_file = os.path.join("/cluster/pixstor/xudong-lab/yuexu/D_PLM/analysis/", f"{pid}_analysis", f"{pid}_pLDDT.tsv")
+        df = pd.read_csv(plddt_file, sep="\t")
+        r1 = df["pLDDT"].values.astype(np.float32)
+        # rep_norm_list.extend(residue_norms)
+        # bf_list.extend(r1)
+        valid_mask = ~np.isnan(r1)
+        # Apply mask to both arrays
+        filtered_norms = residue_norms[valid_mask]
+        filtered_plddt = r1[valid_mask]
+        rep_norm_list.extend(filtered_norms)
+        plddt_list.extend(filtered_plddt)
+        # r2 = df["RMSF_R2"].values
+        # rep_norm_list.extend(residue_norms)
+        # rmsf_list.extend(r2)
+        # r3 = df["RMSF_R3"].values
+        # rep_norm_list.extend(residue_norms)
+        # rmsf_list.extend(r3)
+        # print(r1.shape)
+    
+    return (rep_norm_list, plddt_list)
+
+def elbow2n(emb):
+    # Elbow method to determine optimal number of clusters
+    wcss = []
+    K_range = range(1, 50)
+    
+    for k in K_range:
+        kmeans = KMeans(n_clusters=k, random_state=42)
+        kmeans.fit(emb)
+        wcss.append(kmeans.inertia_)  # Within-cluster sum of squares
+    
+    # Plot elbow curve
+    plt.figure(figsize=(8, 5))
+    plt.plot(K_range, wcss, marker='o')
+    plt.title('Elbow Method for RMSD-Based Clustering')
+    plt.xlabel('Number of clusters (k)')
+    plt.ylabel('Within-Cluster Sum of Squares (WCSS)')
+    plt.xticks(K_range)
+    plt.grid(True)
+    plt.tight_layout()
+    # plt.show()
+    plt.savefig('./1111.png')
+    return 0
+
+def rmsd(args):
+    #
+    args.model,args.alphabet = load_model(args)
+    #
+    datapath = '/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_test/'
+    processed_list=[]
+    rep_norm_list=[]
+    rmsd_list=[]
+    for file_name in os.listdir(datapath):
+        print(f"processing...{file_name}")
+        pid="_".join(file_name.split('_')[:2])
+        if pid in processed_list:
+            continue
+        pdb_file = os.path.join("/cluster/pixstor/xudong-lab/yuexu/D_PLM/analysis/", f"{pid}_analysis", f"{pid}.pdb")
+        args.sequence = str(pdb2seq(pdb_file))
+        #
+        seq_emb = main(args) #[seq_l+2, 1280]
+        # seq_emb = seq_emb[0].cpu()
+        seq_emb = np.linalg.norm(seq_emb[1:-1].cpu(), axis=0) #[1280]
+        # seq_emb = np.sum(seq_emb[1:-1].cpu().numpy(), axis=0)/len(args.sequence) #[1280]
+        # print(seq_emb.shape)
+        # residue_norms = np.linalg.norm(seq_emb.cpu(), axis=1) #[seq_l]
+        #
+        rmsd_file = os.path.join("/cluster/pixstor/xudong-lab/yuexu/D_PLM/analysis/", f"{pid}_analysis", f"{pid}_RMSD.tsv")
+        df = pd.read_csv(rmsd_file, sep="\t")
+        r1 = df["RMSD_R1"].values
+        rep_norm_list.append(seq_emb)
+        rmsd_list.append(r1)
+        # r2 = df["RMSF_R2"].values
+        # rep_norm_list.extend(residue_norms)
+        # rmsf_list.extend(r2)
+        # r3 = df["RMSF_R3"].values
+        # rep_norm_list.extend(residue_norms)
+        # rmsf_list.extend(r3)
+        # print(r1.shape)
+    
+    # return (rep_norm_list, bf_list)
+    # Step 1: Load your data
+    # rmsd_vectors: shape [N_proteins, T]
+    # static_embeddings: shape [N_proteins, D]
+    # rmsd_vectors = np.load("rmsd_vectors.npy")
+    rmsd_vectors = np.array(rmsd_list)
+    static_embeddings = np.array(rep_norm_list)
+    # Optional: Normalize the RMSD vectors
+    # scaler = StandardScaler()
+    # rmsd_vectors = scaler.fit_transform(rmsd_vectors)
+    
+    # Step 2: Clustering
+    # n_clusters = elbow2n(rmsd_vectors)
+    n_clusters = 17  # set this based on elbow method or prior knowledge
+    
+    
+    kmeans_rmsd = KMeans(n_clusters=n_clusters, random_state=0).fit(rmsd_vectors)
+    kmeans_embed = KMeans(n_clusters=n_clusters, random_state=0).fit(static_embeddings)
+    
+    cluster_rmsd = kmeans_rmsd.labels_
+    cluster_embed = kmeans_embed.labels_
+    
+    # Step 3: Clustering comparison metrics
+    ari = adjusted_rand_score(cluster_rmsd, cluster_embed)
+    nmi = normalized_mutual_info_score(cluster_rmsd, cluster_embed)
+    
+    print(f"Adjusted Rand Index (ARI): {ari:.4f}")
+    print(f"Normalized Mutual Information (NMI): {nmi:.4f}")
+    
+    # Step 4: Visualization
+    tsne = TSNE(n_components=2, perplexity=30, random_state=42)
+    tsne_embed = tsne.fit_transform(static_embeddings)
+    
+    plt.figure(figsize=(8, 4))
+    plt.subplot(1, 2, 1)
+    plt.title("Clustered by RMSD")
+    plt.scatter(tsne_embed[:, 0], tsne_embed[:, 1], c=cluster_rmsd, cmap='tab10')
+    plt.subplot(1, 2, 2)
+    plt.title("Clustered by Representation")
+    plt.scatter(tsne_embed[:, 0], tsne_embed[:, 1], c=cluster_embed, cmap='tab10')
+    plt.tight_layout()
+    # plt.show()
+    plt.savefig('./rmsd.png')
+
+def gyr(args):
+    #
+    args.model,args.alphabet = load_model(args)
+    #
+    datapath = '/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_test/'
+    processed_list=[]
+    rep_norm_list=[]
+    gyr_list=[]
+    for file_name in os.listdir(datapath):
+        print(f"processing...{file_name}")
+        pid="_".join(file_name.split('_')[:2])
+        if pid in processed_list:
+            continue
+        pdb_file = os.path.join("/cluster/pixstor/xudong-lab/yuexu/D_PLM/analysis/", f"{pid}_analysis", f"{pid}.pdb")
+        args.sequence = str(pdb2seq(pdb_file))
+        #
+        seq_emb = main(args) #[seq_l+2, 1280]
+        # seq_emb = seq_emb[0].cpu()
+        seq_emb = np.linalg.norm(seq_emb[1:-1].cpu(), axis=0) #[1280]
+        # seq_emb = np.sum(seq_emb[1:-1].cpu().numpy(), axis=0)/len(args.sequence) #[1280]
+        # print(seq_emb.shape)
+        # residue_norms = np.linalg.norm(seq_emb.cpu(), axis=1) #[seq_l]
+        #
+        gyr_file = os.path.join("/cluster/pixstor/xudong-lab/yuexu/D_PLM/analysis/", f"{pid}_analysis", f"{pid}_gyrate.tsv")
+        df = pd.read_csv(gyr_file, sep="\t")
+        r1 = df["gyr_R1"].values
+        rep_norm_list.append(seq_emb)
+        gyr_list.append(r1)
+        # r2 = df["RMSF_R2"].values
+        # rep_norm_list.extend(residue_norms)
+        # rmsf_list.extend(r2)
+        # r3 = df["RMSF_R3"].values
+        # rep_norm_list.extend(residue_norms)
+        # rmsf_list.extend(r3)
+        # print(r1.shape)
+    
+    # return (rep_norm_list, bf_list)
+    # Step 1: Load your data
+    # rmsd_vectors: shape [N_proteins, T]
+    # static_embeddings: shape [N_proteins, D]
+    # rmsd_vectors = np.load("rmsd_vectors.npy")
+    gyr_vectors = np.array(gyr_list)
+    static_embeddings = np.array(rep_norm_list)
+    # Optional: Normalize the RMSD vectors
+    # scaler = StandardScaler()
+    # gyr_vectors = scaler.fit_transform(gyr_vectors)
+    
+    # Step 2: Clustering
+    # n_clusters = elbow2n(gyr_vectors)
+    n_clusters = 17  # set this based on elbow method or prior knowledge
+    
+    
+    kmeans_gyr = KMeans(n_clusters=n_clusters, random_state=0).fit(gyr_vectors)
+    kmeans_embed = KMeans(n_clusters=n_clusters, random_state=0).fit(static_embeddings)
+    
+    cluster_gyr = kmeans_gyr.labels_
+    cluster_embed = kmeans_embed.labels_
+    
+    # Step 3: Clustering comparison metrics
+    ari = adjusted_rand_score(cluster_gyr, cluster_embed)
+    nmi = normalized_mutual_info_score(cluster_gyr, cluster_embed)
+    
+    print(f"Adjusted Rand Index (ARI): {ari:.4f}")
+    print(f"Normalized Mutual Information (NMI): {nmi:.4f}")
+    
+    # Step 4: Visualization
+    tsne = TSNE(n_components=2, perplexity=30, random_state=42)
+    tsne_embed = tsne.fit_transform(static_embeddings)
+    
+    plt.figure(figsize=(8, 4))
+    plt.subplot(1, 2, 1)
+    plt.title("Clustered by gyr")
+    plt.scatter(tsne_embed[:, 0], tsne_embed[:, 1], c=cluster_gyr, cmap='tab10')
+    plt.subplot(1, 2, 2)
+    plt.title("Clustered by Representation")
+    plt.scatter(tsne_embed[:, 0], tsne_embed[:, 1], c=cluster_embed, cmap='tab10')
+    plt.tight_layout()
+    # plt.show()
+    plt.savefig('./gyr.png')
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='PyTorch SimCLR')
-    parser.add_argument("--model-location", type=str, help="xx", default='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/geom2vec_tematt/checkpoints/checkpoint_0002000.pth')
-    parser.add_argument("--config-path", type=str, default='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/geom2vec_tematt/config_geom2vec_tematt.yaml', help="xx")
+    parser.add_argument("--model-location", type=str, help="xx", default='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_lora2/checkpoints/checkpoint_best_val_dms_corr.pth')
+    parser.add_argument("--config-path", type=str, default='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_lora2/config_lora2.yaml', help="xx")
     parser.add_argument("--model-type", default='d-plm', type=str, help="xx")
     parser.add_argument("--sequence", type=str, help="xx")
     parser.add_argument("--output_path", type=str, default='/cluster/pixstor/xudong-lab/yuexu/D_PLM/evaluate/', help="xx")
     args = parser.parse_args()
 
+    #RMSF
     (rep_norm_list, rmsf_list), (rep_dis_list, dccm_list) = gogogo(args)
-
     corr, _ = spearmanr(rep_norm_list, rmsf_list)
-    plot_and_fit(rep_norm_list, rmsf_list, 'rep_norm', 'rmsf', corr, args.output_path, 'rep_norm_rmsf_lora2')
+    plot_and_fit(rep_norm_list, rmsf_list, 'rep_norm', 'rmsf', corr, args.output_path, 'rep_norm_rmsf_e')
+    # corr, _ = spearmanr(rep_dis_list, dccm_list)
+    # plot_and_fit(rep_dis_list, dccm_list, 'rep_dis', 'dccm', corr, args.output_path, 'rep_dis_dccm_lora2')
+    #Bfactor
+    (rep_norm_list, bf_list) = B_factor(args)
+    corr, _ = spearmanr(rep_norm_list, bf_list)
+    plot_and_fit(rep_norm_list, bf_list, 'rep_norm', 'Bfactor', corr, args.output_path, 'rep_norm_Bfactor_e')
+    #Bfactor
+    (rep_norm_list, plddt_list) = plddt(args)
+    corr, _ = spearmanr(rep_norm_list, plddt_list)
+    plot_and_fit(rep_norm_list, plddt_list, 'rep_norm', 'plDDT', corr, args.output_path, 'rep_norm_plDDT_e')
+    #rmsd
+    rmsd(args)
+    #gyr
+    gyr(args)
 
-    corr, _ = spearmanr(rep_dis_list, dccm_list)
-    plot_and_fit(rep_dis_list, dccm_list, 'rep_dis', 'dccm', corr, args.output_path, 'rep_dis_dccm_lora2')
+
+
+
 
     
 
