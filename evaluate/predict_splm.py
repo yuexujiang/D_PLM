@@ -28,25 +28,36 @@ from collections import OrderedDict
 import matplotlib.pyplot as plt
 import os
 from scipy.stats import spearmanr
+from peft import PeftModel, LoraConfig, get_peft_model
 
 def load_checkpoints(model,checkpoint_path):
         if checkpoint_path is not None:
             checkpoint = torch.load(checkpoint_path, map_location=lambda storage, loc: storage)
-            if np.sum(["adapter_layer_dict" in key for key in checkpoint[
-                'state_dict1'].keys()]) == 0:  # using old checkpoints, need to rename the adapter_layer into adapter_layer_dict.adapter_0
-                new_ordered_dict = OrderedDict()
-                for key, value in checkpoint['state_dict1'].items():
-                    if "adapter_layer_dict" not in key:
-                        new_key = key.replace('adapter_layer', 'adapter_layer_dict.adapter_0')
-                        new_ordered_dict[new_key] = value
-                    else:
-                        new_ordered_dict[key] = value
-                
-                model.load_state_dict(new_ordered_dict, strict=False)
-            else:
+            if  any('adapter' in name for name, _ in model.named_modules()):
+                if np.sum(["adapter_layer_dict" in key for key in checkpoint[
+                    'state_dict1'].keys()]) == 0:  # using old checkpoints, need to rename the adapter_layer into adapter_layer_dict.adapter_0
+                    new_ordered_dict = OrderedDict()
+                    for key, value in checkpoint['state_dict1'].items():
+                        if "adapter_layer_dict" not in key:
+                            new_key = key.replace('adapter_layer', 'adapter_layer_dict.adapter_0')
+                            new_ordered_dict[new_key] = value
+                        else:
+                            new_ordered_dict[key] = value
+                    
+                    model.load_state_dict(new_ordered_dict, strict=False)
+                else:
+                    #this model does not contain esm2
+                    new_ordered_dict = OrderedDict()
+                    for key, value in checkpoint['state_dict1'].items():
+                            key = key.replace("esm2.","")
+                            new_ordered_dict[key] = value
+                    
+                    model.load_state_dict(new_ordered_dict, strict=False)
+            elif  any('lora' in name for name, _ in model.named_modules()):
                 #this model does not contain esm2
                 new_ordered_dict = OrderedDict()
                 for key, value in checkpoint['state_dict1'].items():
+                        print(key)
                         key = key.replace("esm2.","")
                         new_ordered_dict[key] = value
                 
@@ -320,9 +331,31 @@ def load_model(args):
         with open(args.config_path) as file:
             config_file = yaml.full_load(file)
             configs = load_configs(config_file, args=None)
+        if configs.model.esm_encoder.adapter_h.enable:
+            model, alphabet = esm_adapterH.pretrained.esm2_t33_650M_UR50D(configs.model.esm_encoder.adapter_h)
+        elif configs.model.esm_encoder.lora.enable:
+            model, alphabet = esm.pretrained.esm2_t33_650M_UR50D()
+            lora_targets =  ["self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj","self_attn.out_proj"]
+            target_modules=[]
+            if configs.model.esm_encoder.lora.esm_num_end_lora > 0:
+                start_layer_idx = np.max([model.num_layers - configs.model.esm_encoder.lora.esm_num_end_lora, 0])
+                for idx in range(start_layer_idx, model.num_layers):
+                    for layer_name in lora_targets:
+                        target_modules.append(f"layers.{idx}.{layer_name}")
+                
+            peft_config = LoraConfig(
+                inference_mode=False,
+                r=configs.model.esm_encoder.lora.r,
+                lora_alpha=configs.model.esm_encoder.lora.alpha,
+                target_modules=target_modules,
+                lora_dropout=configs.model.esm_encoder.lora.dropout,
+                bias="none",
+                # modules_to_save=modules_to_save
+            )
+            peft_model = get_peft_model(model, peft_config)
         
         # inference for each model
-        model, alphabet = esm_adapterH.pretrained.esm2_t33_650M_UR50D(configs.model.esm_encoder.adapter_h)
+        # model, alphabet = esm_adapterH.pretrained.esm2_t33_650M_UR50D(configs.model.esm_encoder.adapter_h)/
         load_checkpoints(model,args.model_location)
     elif args.model_type=="ESM2":
         #if use ESM2

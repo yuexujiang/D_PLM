@@ -102,6 +102,8 @@ valid_settings:
   cath_path: /cluster/pixstor/xudong-lab/duolin/CATH/seq_subfamily/Rep_subfamily_basedon_S40pdb.fa
   deaminase_path: /cluster/pixstor/xudong-lab/duolin/simCLR/Deaminases_clustering/Table_S1.xlsx
   kinase_path: /cluster/pixstor/xudong-lab/duolin/simCLR/kinase_clustering/GPS5.0_homo_hasPK_with_kinasedomain.txt
+  dms_summary_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/ESM_1v_data/results/ESM-1v_data_summary_start_end_seq_splm_esm2.csv
+  dms_path: "/cluster/pixstor/xudong-lab/yuexu/D_PLM/ESM_1v_data/data_wedownloaded/41 mutation dataset"
   do_every: 50 # steps
   num_workers: 1
   batch_size: 64
