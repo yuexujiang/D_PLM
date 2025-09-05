@@ -513,6 +513,20 @@ result_path='./results/vivit_2/'
 sbatch --export=config_path=$config_path,result_path=$result_path, \
      -J ${task} \
      run_yjm85.sh
+
+task="vivit3"
+config_path='./configs_hell/gvp_v2/config_vivit3.yaml'
+result_path='./results/vivit_3/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
+
+task="vivit_lora3"
+config_path='./configs_hell/gvp_v2/config_lora3.yaml'
+result_path='./results/vivit_lora3/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
 #####################
 #need to submit in sbatch, need long time
 task="ESM1v_test"

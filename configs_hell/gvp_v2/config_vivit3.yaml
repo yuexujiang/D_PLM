@@ -11,7 +11,7 @@ resume:
 
 model:
   residue_out_dim: 64
-  protein_out_dim: 512
+  protein_out_dim: 256
   residue_num_projector: 1
   protein_num_projector: 2
   X_module: MD #structure
@@ -19,7 +19,7 @@ model:
   MD_encoder:
     model_name: google/vivit-b-16x2-kinetics400
     residue_inner_dim: 1024
-    protein_inner_dim: 1024
+    protein_inner_dim: 2048
     dim_mlp: 768
     fine_tuning:
          enable: False
@@ -29,20 +29,19 @@ model:
     model_name:  esm2_t33_650M_UR50D # esm2_t33_650M_UR50D, esm2_t30_150M_UR50D, esm2_t12_35M_UR50D, esm2_t6_8M_UR50D
     max_length: 512
     residue_inner_dim: 1024
-    protein_inner_dim: 1024
+    protein_inner_dim: 2048
     fine_tuning:
       enable: False
       unfix_last_layer: 4
     adapter_h:
-      enable: False
+      enable: True
       num_end_adapter_layers: 16
       module_type: "MLP1"
     lora:
-      enable: True
-      r: 2 #8
-      alpha: 8 #32
+      enable: False
+      r: 8
+      alpha: 32
       dropout: 0.05
-      esm_num_end_lora: 16
       resume:
         enable: False
         checkpoint_path: path/to/checkpoints.pth
@@ -85,7 +84,7 @@ train_settings:
   Atlas_test_repli_0_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_test_rep0
   Atlas_test_repli_1_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_test_rep1
   Atlas_test_repli_2_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_test_rep2
-  num_steps: 5000 #10000000
+  num_steps: 3000 #10000000
   shuffle: True
   mixed_precision: "fp16" # no, fp16, bf16, fp8
   batch_size: 32
@@ -93,7 +92,7 @@ train_settings:
   num_workers: 1
   gradient_accumulation: 1
   n_views: 2
-  temperature: 0.2
+  temperature: 0.1
   plddt_weight: True
   plddt_weight_mode: "all" #"positive" "all"
 
@@ -104,11 +103,11 @@ valid_settings:
   deaminase_path: /cluster/pixstor/xudong-lab/duolin/simCLR/Deaminases_clustering/Table_S1.xlsx
   kinase_path: /cluster/pixstor/xudong-lab/duolin/simCLR/kinase_clustering/GPS5.0_homo_hasPK_with_kinasedomain.txt
   dms_summary_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/ESM_1v_data/results/ESM-1v_data_summary_start_end_seq_splm_esm2.csv
-  dms_path: "/cluster/pixstor/xudong-lab/yuexu/D_PLM/ESM_1v_data/data_wedownloaded/41 mutation dataset"
+  dms_path: "/cluster/pixstor/xudong-lab/yuexu/D_PLM/ESM_1v_data/data_wedownloaded/41 mutation dataset/ESM-1v-41/"
   analysis_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/analysis/
   do_every: 50 # steps
   num_workers: 1
-  batch_size: 64
+  batch_size: 1
   eval_struct: 
       enable: False
       do_every: 1000
@@ -117,8 +116,6 @@ valid_settings:
 optimizer:
   name: sgd
   lr_seq: 0.01
-  lr_struct: 0.00001
-  lr_MD: 0.0001
   lr_x: 0.0001
   weight_decouple: True
   weight_decay: 0.0005

@@ -24,6 +24,8 @@ from collections import OrderedDict
 from inspect import signature
 from sklearn.metrics import silhouette_score
 from tqdm import tqdm
+from scipy.stats import spearmanr, pearsonr
+from Bio.PDB import PDBParser, PPBuilder
 
 
 def get_embedding(embed_dim, num_embeddings):
@@ -1068,6 +1070,56 @@ def test_DMS(configs, seq_model, alphabet, n_steps, logging):
 
     return esm_rla_spearmn
 
+def pdb2seq(pdb_path):
+    # Create a PDB parser object
+    parser = PDBParser(QUIET=True)
+    
+    # Parse the structure from the PDB file
+    structure = parser.get_structure("protein", pdb_path)
+    
+    # Initialize the polypeptide builder
+    ppb = PPBuilder()
+    
+    # Extract sequences from all chains in the structure
+    for model in structure:
+        for chain in model:
+            # Build polypeptides for the chain (could be more than one segment)
+            polypeptides = ppb.build_peptides(chain)
+            for poly_index, poly in enumerate(polypeptides):
+                sequence = poly.get_sequence()
+                # print(f"Chain {chain.id} (segment {poly_index}): {sequence}")
+    return sequence
+
+def test_rmsf_cor(val_loader, batch_converter, configs, seq_model, n_steps, logging):
+    processed_list=[]
+    rep_norm_list=[]
+    rmsf_list=[]
+    for batch in val_loader:
+        pid = batch['pid'][0]
+        pid = pid.split('#')[0]
+        if pid in processed_list:
+            continue
+        pdb_file = os.path.join(configs.valid_settings.analysis_path, f"{pid}_analysis", f"{pid}.pdb")
+        # pdb_file = os.path.join("../analysis/", f"{pid}_analysis", f"{pid}.pdb")
+        sequence = str(pdb2seq(pdb_file))
+        data = [("protein1", sequence),]
+        batch_labels, batch_strs, batch_tokens = batch_converter(data)
+        with torch.no_grad():
+            wt_representation = seq_model(batch_tokens.cuda(),repr_layers=[seq_model.num_layers])["representations"][seq_model.num_layers]
+        
+        wt_representation = wt_representation.squeeze(0) #only one sequence a time
+        seq_emb = wt_representation[1:-1]
+        residue_norms = np.linalg.norm(seq_emb.cpu(), axis=1)
+        rmsf_file = os.path.join(configs.valid_settings.analysis_path, f"{pid}_analysis", f"{pid}_RMSF.tsv")
+        df = pd.read_csv(rmsf_file, sep="\t")
+        r1 = df["RMSF_R1"].values
+        rep_norm_list.extend(residue_norms)
+        rmsf_list.extend(r1)
+        processed_list.append(pid)
+    
+    corr, _ = spearmanr(rep_norm_list, rmsf_list)
+    logging.info(f"step:{n_steps} rmsf_cor:{corr:.4f}")
+    return corr
 
 # test_evaluate_allcases()
 """

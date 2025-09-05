@@ -15,7 +15,8 @@ load_configs, test_gpu_cuda, prepare_saving_dir, save_best_checkpoints
 from utils.utils import get_logging, prepare_tensorboard
 from utils.utils import accuracy, residue_batch_sample
 from utils.evaluation import evaluate_with_deaminase, evaluate_with_kinase, evaluate_with_cath_more, \
-                             evaluate_with_deaminase_md, evaluate_with_kinase_md, evaluate_with_cath_more_md, test_DMS
+                             evaluate_with_deaminase_md, evaluate_with_kinase_md, evaluate_with_cath_more_md, test_DMS, \
+                             test_rmsf_cor
 from utils.cath_with_struct import evaluate_with_cath_more_struct
 
 
@@ -572,7 +573,7 @@ def prepare_loss_MD(simclr,traj,batch_tokens,criterion, loss,
     # return loss, simclr_loss,simclr_residue_loss,MLM_loss, logits, labels, logits_residue, labels_residue
     return loss, simclr_loss, MLM_loss, logits, labels
 
-def training_loop_MD(simclr, start_step, start_dms, start_loss, train_loader, val_loader, test_loader, batch_converter, criterion,
+def training_loop_MD(simclr, start_step, start_dms, start_loss, start_rmsf, train_loader, val_loader, test_loader, batch_converter, criterion,
                   optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, train_writer, valid_writer,
                   result_path, logging, configs, replicate, masked_lm_data_collator=None, **kwargs):
     torch.cuda.empty_cache()
@@ -597,6 +598,7 @@ def training_loop_MD(simclr, start_step, start_dms, start_loss, train_loader, va
     best_val_loss = start_loss #np.inf
     best_val_graph_loss = start_loss #np.inf
     best_val_dms_corr = start_dms #0.0
+    best_val_rmsf_cor = start_rmsf
     while True:
         epoch_num += 1
         if accelerator.is_main_process:
@@ -687,6 +689,14 @@ def training_loop_MD(simclr, start_step, start_dms, start_loss, train_loader, va
                                      result_path, accelerator.unwrap_model(simclr), n_steps, logging, epoch_num,
                                      best_val_dms_corr, val_DMS_corr, 'best_val_dms_corr', direction='high')
                     
+                    val_rmsf_cor = test_rmsf_cor(val_loader, batch_converter, configs, simclr.model_seq.esm2,
+                                                 n_steps, logging)
+                    val_rmsf_cor = abs(val_rmsf_cor)
+                    best_val_rmsf_cor = save_best_checkpoints(accelerator.unwrap_model(optimizer_x),
+                                     accelerator.unwrap_model(optimizer_seq),
+                                     result_path, accelerator.unwrap_model(simclr), n_steps, logging, epoch_num,
+                                     best_val_rmsf_cor, val_rmsf_cor, 'best_val_rmsf_cor', direction='high')
+                    
                     best_val_loss = save_best_checkpoints(accelerator.unwrap_model(optimizer_x),
                                      accelerator.unwrap_model(optimizer_seq),
                                      result_path, accelerator.unwrap_model(simclr), n_steps, logging, epoch_num,
@@ -720,7 +730,7 @@ def training_loop_MD(simclr, start_step, start_dms, start_loss, train_loader, va
         if accelerator.is_main_process:
             logging.info(f"one epoch cost {(end - start):.2f}, number of trained steps {n_steps}")
 
-    return n_steps, accelerator, optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, best_val_dms_corr, best_val_loss
+    return n_steps, accelerator, optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, best_val_dms_corr, best_val_loss, best_val_rmsf_cor
 
 def evaluation_loop_MD(simclr, val_loader, labels, batch_converter, criterion, configs, logging, **kwargs):
     accelerator = kwargs['accelerator']
@@ -1401,16 +1411,16 @@ def main(args, dict_configs, config_file_path):
         )
 
     elif configs.model.X_module == 'MD' or configs.model.X_module == 'vivit':
-        start_step, accelerator, optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, best_dms, best_loss = training_loop_MD(
-            simclr, start_step, 0.0, np.inf, train_dataloader_repli_0, val_dataloader_repli_0, test_dataloader_repli_0, batch_converter, criterion,
+        start_step, accelerator, optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, best_dms, best_loss, best_rmsf = training_loop_MD(
+            simclr, start_step, 0.0, np.inf, 0.0, train_dataloader_repli_0, val_dataloader_repli_0, test_dataloader_repli_0, batch_converter, criterion,
             optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, train_writer, valid_writer,
             result_path, logging, configs, replicate=0, masked_lm_data_collator=masked_lm_data_collator, accelerator=accelerator)
-        start_step, accelerator, optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, best_dms, best_loss = training_loop_MD(
-            simclr, start_step, best_dms, best_loss, train_dataloader_repli_1, val_dataloader_repli_1, test_dataloader_repli_1, batch_converter, criterion,
+        start_step, accelerator, optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, best_dms, best_loss, best_rmsf = training_loop_MD(
+            simclr, start_step, best_dms, best_loss, best_rmsf, train_dataloader_repli_1, val_dataloader_repli_1, test_dataloader_repli_1, batch_converter, criterion,
             optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, train_writer, valid_writer,
             result_path, logging, configs, replicate=1, masked_lm_data_collator=masked_lm_data_collator, accelerator=accelerator)
-        start_step, accelerator, optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, best_dms, best_loss = training_loop_MD(
-            simclr, start_step, best_dms, best_loss, train_dataloader_repli_2, val_dataloader_repli_2, test_dataloader_repli_2, batch_converter, criterion,
+        start_step, accelerator, optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, best_dms, best_loss, best_rmsf = training_loop_MD(
+            simclr, start_step, best_dms, best_loss, best_rmsf, train_dataloader_repli_2, val_dataloader_repli_2, test_dataloader_repli_2, batch_converter, criterion,
             optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, train_writer, valid_writer,
             result_path, logging, configs, replicate=2, masked_lm_data_collator=masked_lm_data_collator, accelerator=accelerator)
     elif configs.model.X_module == 'DCCM_GNN':
