@@ -1090,7 +1090,7 @@ def pdb2seq(pdb_path):
                 # print(f"Chain {chain.id} (segment {poly_index}): {sequence}")
     return sequence
 
-def test_rmsf_cor(val_loader, batch_converter, configs, seq_model, n_steps, logging):
+def test_rmsf_cor(val_loader, alphabet, configs, seq_model, n_steps, logging):
     processed_list=[]
     rep_norm_list=[]
     rmsf_list=[]
@@ -1103,6 +1103,7 @@ def test_rmsf_cor(val_loader, batch_converter, configs, seq_model, n_steps, logg
         # pdb_file = os.path.join("../analysis/", f"{pid}_analysis", f"{pid}.pdb")
         sequence = str(pdb2seq(pdb_file))
         data = [("protein1", sequence),]
+        batch_converter = alphabet.get_batch_converter()
         batch_labels, batch_strs, batch_tokens = batch_converter(data)
         with torch.no_grad():
             wt_representation = seq_model(batch_tokens.cuda(),repr_layers=[seq_model.num_layers])["representations"][seq_model.num_layers]
@@ -1116,6 +1117,10 @@ def test_rmsf_cor(val_loader, batch_converter, configs, seq_model, n_steps, logg
         rep_norm_list.extend(residue_norms)
         rmsf_list.extend(r1)
         processed_list.append(pid)
+        # print(pid)
+        # print(len(sequence))
+        # print(len(residue_norms))
+        # print(len(r1))
     
     corr, _ = spearmanr(rep_norm_list, rmsf_list)
     logging.info(f"step:{n_steps} rmsf_cor:{corr:.4f}")

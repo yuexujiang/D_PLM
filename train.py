@@ -689,7 +689,7 @@ def training_loop_MD(simclr, start_step, start_dms, start_loss, start_rmsf, trai
                                      result_path, accelerator.unwrap_model(simclr), n_steps, logging, epoch_num,
                                      best_val_dms_corr, val_DMS_corr, 'best_val_dms_corr', direction='high')
                     
-                    val_rmsf_cor = test_rmsf_cor(val_loader, batch_converter, configs, simclr.model_seq.esm2,
+                    val_rmsf_cor = test_rmsf_cor(val_loader, simclr.model_seq.alphabet, configs, simclr.model_seq.esm2,
                                                  n_steps, logging)
                     val_rmsf_cor = abs(val_rmsf_cor)
                     best_val_rmsf_cor = save_best_checkpoints(accelerator.unwrap_model(optimizer_x),
