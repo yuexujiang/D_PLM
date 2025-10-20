@@ -746,6 +746,24 @@ scoring_strategy='wt-mt-RLA' #"mask-marginals
 sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
        -J ${task} \
        ./evaluate/mutation_effect_ESM1v.pbs
+
+task="vivit3_eval"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_3/checkpoints/checkpoint_best_val_rmsf_cor.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_3/config_vivit3.yaml'
+scoring_strategy='wt-mt-RLA' #"mask-marginals
+sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
+       -J ${task} \
+       ./evaluate/mutation_effect_ESM1v.pbs
+
+task="lora3_eval"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_lora3/checkpoints/checkpoint_best_val_rmsf_cor.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_lora3/config_lora3.yaml'
+scoring_strategy='wt-mt-RLA' #"mask-marginals
+sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
+       -J ${task} \
+       ./evaluate/mutation_effect_ESM1v.pbs
+
+
 #####################################################
 task="v2"
 folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
