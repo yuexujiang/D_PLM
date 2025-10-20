@@ -124,25 +124,38 @@ def vectors_to_contact_maps(vecs):
     return contact_maps
     
 
+# def pdb2seq(pdb_path):
+#     # Create a PDB parser object
+#     parser = PDBParser(QUIET=True)
+    
+#     # Parse the structure from the PDB file
+#     structure = parser.get_structure("protein", pdb_path)
+    
+#     # Initialize the polypeptide builder
+#     ppb = PPBuilder()
+    
+#     # Extract sequences from all chains in the structure
+#     for model in structure:
+#         for chain in model:
+#             # Build polypeptides for the chain (could be more than one segment)
+#             polypeptides = ppb.build_peptides(chain)
+#             for poly_index, poly in enumerate(polypeptides):
+#                 sequence = poly.get_sequence()
+#                 # print(f"Chain {chain.id} (segment {poly_index}): {sequence}")
+#     return sequence
 def pdb2seq(pdb_path):
-    # Create a PDB parser object
     parser = PDBParser(QUIET=True)
-    
-    # Parse the structure from the PDB file
     structure = parser.get_structure("protein", pdb_path)
-    
-    # Initialize the polypeptide builder
     ppb = PPBuilder()
     
-    # Extract sequences from all chains in the structure
+    sequences = []
     for model in structure:
         for chain in model:
-            # Build polypeptides for the chain (could be more than one segment)
             polypeptides = ppb.build_peptides(chain)
-            for poly_index, poly in enumerate(polypeptides):
-                sequence = poly.get_sequence()
-                # print(f"Chain {chain.id} (segment {poly_index}): {sequence}")
-    return sequence
+            seq = "".join(str(poly.get_sequence()) for poly in polypeptides)
+            sequences.append(seq)
+    
+    return "".join(sequences)
 
 def normalize_contact_map(contact_map):
     # Option 1: Divide by maximum value (if maximum is known and consistent)
