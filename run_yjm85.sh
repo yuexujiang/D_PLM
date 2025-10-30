@@ -22,4 +22,5 @@ export HF_HOME=/cluster/pixstor/xudong-lab/yuexu/transformers_cache/
 
 # accelerate launch train.py --config_path ./configs_hell/gvp_v2/config_plddtallweight_noseq_v2.yaml \
 # --result_path ./results/plddtallweight_noseq_v2/
-accelerate launch train.py --config_path $config_path --result_path $result_path
+#accelerate launch train.py --config_path $config_path --result_path $result_path
+accelerate launch train_mdcath.py --config_path $config_path --result_path $result_path

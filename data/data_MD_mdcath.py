@@ -93,6 +93,16 @@ def prepare_dataloaders(configs):
             (train_dataloader_repli_1, val_dataloader_repli_1, test_dataloader_repli_1),
             (train_dataloader_repli_2, val_dataloader_repli_2, test_dataloader_repli_2))
 
+def prepare_dataloaders_mdCATH(configs):
+    result=[]
+    for rep in range(25):
+        train_dataloader_repli, val_dataloader_repli, test_dataloader_repli = prepare_replicate(configs, 
+                                                                          configs.train_settings.mdCATH_data_repli_path[rep], 
+                                                                          configs.train_settings.mdCATH_test_repli_path[rep])
+        result.append((train_dataloader_repli, val_dataloader_repli, test_dataloader_repli))
+
+    
+    return result
 
 def vectors_to_contact_maps(vecs):
     """

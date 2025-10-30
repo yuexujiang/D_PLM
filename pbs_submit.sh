@@ -527,6 +527,27 @@ result_path='./results/vivit_lora3/'
 sbatch --export=config_path=$config_path,result_path=$result_path, \
      -J ${task} \
      run_yjm85.sh
+
+task="vivit_mdcath_mlm_resume"
+config_path='./configs_hell/gvp_v2/config_mlm_mdcath_resume.yaml'
+result_path='./results/vivit_mlm_mdcath_resume/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh 
+
+task="vivit3_mlm"
+config_path='./configs_hell/gvp_v2/config_vivit3_mlm.yaml'
+result_path='./results/vivit_3_mlm/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
+     
+task="vivit3_mlm_resume"
+config_path='./configs_hell/gvp_v2/config_vivit3_mlm_resume.yaml'
+result_path='./results/vivit_3_mlm_resume/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh 
 #####################
 #need to submit in sbatch, need long time
 task="ESM1v_test"
@@ -783,5 +804,65 @@ task="test"
 folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
 outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_gvp_test/'
 sbatch --export=folder=$folder,outfolder=$outfolder, \
+     -J ${task} \
+     data_process.pbs
+
+#################
+task="data0"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/mdCATH_traj/'
+num=0
+split_num=6
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_mdCATH'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+
+
+task="data1"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/mdCATH_traj/'
+num=1
+split_num=6
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_mdCATH'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+     
+     
+task="data2"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/mdCATH_traj/'
+num=2
+split_num=6
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_mdCATH'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+     
+     
+task="data3"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/mdCATH_traj/'
+num=3
+split_num=6
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_mdCATH'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+     
+     
+task="data4"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/mdCATH_traj/'
+num=4
+split_num=6
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_mdCATH'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+     
+
+task="data5"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/mdCATH_traj/'
+num=5
+split_num=6
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_mdCATH'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
      -J ${task} \
      data_process.pbs

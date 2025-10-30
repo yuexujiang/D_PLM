@@ -1126,6 +1126,41 @@ def test_rmsf_cor(val_loader, alphabet, configs, seq_model, n_steps, logging):
     logging.info(f"step:{n_steps} rmsf_cor:{corr:.4f}")
     return corr
 
+def test_rmsf_cor_mdcath(alphabet, configs, seq_model, n_steps, logging):
+    processed_list=[]
+    rep_norm_list=[]
+    rmsf_list=[]
+    num=0
+    for subfolder in os.listdir(configs.valid_settings.analysis_path):
+        if num>500:
+            break
+        pid=os.path.basename(subfolder)
+        pid="_".join(pid.split("_")[:2])
+        pdb_file = os.path.abspath(os.path.join(configs.valid_settings.analysis_path,
+                                                subfolder, f"{pid}.pdb"))
+        sequence = str(pdb2seq(pdb_file))
+        data = [("protein1", sequence),]
+        batch_converter = alphabet.get_batch_converter()
+        batch_labels, batch_strs, batch_tokens = batch_converter(data)
+        with torch.no_grad():
+            wt_representation = seq_model(batch_tokens.cuda(),repr_layers=[seq_model.num_layers])["representations"][seq_model.num_layers]
+        
+        wt_representation = wt_representation.squeeze(0) #only one sequence a time
+        seq_emb = wt_representation[1:-1]
+        residue_norms = np.linalg.norm(seq_emb.cpu(), axis=1)
+        rmsf_file = os.path.abspath(os.path.join(configs.valid_settings.analysis_path,
+                                                 subfolder, f"{pid}_RMSF.tsv"))
+        df = pd.read_csv(rmsf_file, sep="\t")
+        r1 = df["RMSF_R1"].values
+        rep_norm_list.extend(residue_norms)
+        rmsf_list.extend(r1)
+        processed_list.append(pid)
+        num+=1
+    corr, _ = spearmanr(rep_norm_list, rmsf_list)
+    logging.info(f"step:{n_steps} rmsf_cor:{corr:.4f}")
+    return corr
+
+
 # test_evaluate_allcases()
 """
 #ESM2 650M： 
