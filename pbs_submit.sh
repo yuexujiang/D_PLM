@@ -548,6 +548,93 @@ result_path='./results/vivit_3_mlm_resume/'
 sbatch --export=config_path=$config_path,result_path=$result_path, \
      -J ${task} \
      run_yjm85.sh 
+
+task="mdcath"
+config_path='./configs_hell/gvp_v2/config_mdcath.yaml'
+result_path='./results/mdcath/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh 
+
+task="vivit3_resume"
+config_path='./configs_hell/gvp_v2/config_vivit3_resume.yaml'
+result_path='./results/vivit3_resume/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh 
+
+task="vivit_md_FFT_tune"
+config_path='./configs_hell/gvp_v2/config_vivit_tune.yaml'
+result_path='./results/vivit_md_FFT_tune/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh 
+
+task="vivit_cluster_tune"
+config_path='./configs_hell/gvp_v2/config_vivit_cluster_mlm.yaml'
+result_path='./results/vivit_cluster_tune/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh 
+
+task="vivit3_splm_mlm.yaml"
+config_path='./configs_hell/gvp_v2/config_vivit3_splm_mlm.yaml'
+result_path='./results/vivit3_splm_mlm/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh 
+
+task="vivit3_ft_mlm.yaml"
+config_path='./configs_hell/gvp_v2/config_vivit3_ft_mlm.yaml'
+result_path='./results/vivit3_ft_mlm/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh 
+
+task="vivit_cluster_ft_mlm"
+config_path='./configs_hell/gvp_v2/config_vivit_cluster_ft_mlm.yaml'
+result_path='./results/vivit_cluster_ft_mlm/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh 
+
+task="vivit_cluster_adp"
+config_path='./configs_hell/gvp_v2/config_vivit_cluster_adp.yaml'
+result_path='./results/vivit_cluster_adp/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh 
+
+task="vivit_cluster_adp_lr"
+config_path='./configs_hell/gvp_v2/config_vivit_cluster_adp_lr.yaml'
+result_path='./results/vivit_cluster_adp_lr/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh 
+
+task="vivit_cluster_lora"
+config_path='./configs_hell/gvp_v2/config_vivit_cluster_lora.yaml'
+result_path='./results/vivit_cluster_lora/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh 
+
+task="vivit_cluster_adp2"
+config_path='./configs_hell/gvp_v2/config_vivit_cluster_adp2.yaml'
+result_path='./results/vivit_cluster_adp2/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
+
+task="vivit_cluster_adp_sftsprloss"
+config_path='./configs_hell/gvp_v2/config_vivit_cluster_adp_sftsprloss.yaml'
+result_path='./results/vivit_cluster_adp_sftsprloss/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
+###############################
+task="ddt"
+sbatch -J ${task} ./evaluate/ddt_train.pbs
 #####################
 #need to submit in sbatch, need long time
 task="ESM1v_test"
@@ -784,7 +871,29 @@ sbatch --export=model_location=$model_location,config_path=$config_path,scoring_
        -J ${task} \
        ./evaluate/mutation_effect_ESM1v.pbs
 
+task="mdcath_resume_eval"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_mlm_mdcath_resume/checkpoints/checkpoint_best_val_rmsf_cor.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_mlm_mdcath_resume/config_mlm_mdcath_resume.yaml'
+scoring_strategy='mask-marginals' #"mask-marginals" "wt-mt-RLA"
+sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
+       -J ${task} \
+       ./evaluate/mutation_effect_ESM1v.pbs
 
+task="vivit_cluster_tune"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_cluster_tune/checkpoints/checkpoint_best_val_rmsf_cor.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_cluster_tune/config_vivit_cluster_mlm.yaml'
+scoring_strategy='wt-mt-RLA' #"mask-marginals" "wt-mt-RLA"
+sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
+       -J ${task} \
+       ./evaluate/mutation_effect_ESM1v.pbs
+
+task="vivit_CHANGE_tune"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_change_tune/checkpoints/checkpoint_best_val_rmsf_cor.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_change_tune/config_vivit_change_mlm.yaml'
+scoring_strategy='wt-mt-RLA' #"mask-marginals" "wt-mt-RLA"
+sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
+       -J ${task} \
+       ./evaluate/mutation_effect_ESM1v.pbs
 #####################################################
 task="v2"
 folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
@@ -864,5 +973,663 @@ num=5
 split_num=6
 outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_mdCATH'
 sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+
+#################
+task="data0"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
+num=0
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_FFT_atlas_test'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+
+
+task="data1"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
+num=1
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_FFT_atlas_test'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+     
+     
+task="data2"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
+num=2
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_FFT_atlas_test'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+     
+     
+task="data3"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
+num=3
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_FFT_atlas_test'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+     
+     
+task="data4"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
+num=4
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_FFT_atlas_test'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+     
+task="data0"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
+num=0
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_FFT_atlas_data'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+
+
+task="data1"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
+num=1
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_FFT_atlas_data'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+     
+     
+task="data2"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
+num=2
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_FFT_atlas_data'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+     
+     
+task="data3"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
+num=3
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_FFT_atlas_data'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+     
+     
+task="data4"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
+num=4
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_FFT_atlas_data'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+
+task="v2_0"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
+num=0
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_FFT_atlas_v2added'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+
+
+task="v2_1"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
+num=1
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_FFT_atlas_v2added'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+     
+     
+task="v2_2"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
+num=2
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_FFT_atlas_v2added'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+     
+     
+task="v2_3"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
+num=3
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_FFT_atlas_v2added'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+     
+     
+task="v2_4"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
+num=4
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_FFT_atlas_v2added'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+
+task="test0"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
+num=0
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_changeDetec_atlas_test'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+
+
+task="test1"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
+num=1
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_changeDetec_atlas_test'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+     
+     
+task="test2"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
+num=2
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_changeDetec_atlas_test'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+     
+     
+task="test3"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
+num=3
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_changeDetec_atlas_test'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+     
+     
+task="test4"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
+num=4
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_changeDetec_atlas_test'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+
+task="data0"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
+num=0
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_changeDetec_atlas_data'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+
+
+task="data1"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
+num=1
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_changeDetec_atlas_data'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+     
+     
+task="data2"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
+num=2
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_changeDetec_atlas_data'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+     
+     
+task="data3"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
+num=3
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_changeDetec_atlas_data'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+     
+     
+task="data4"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
+num=4
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_changeDetec_atlas_data'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+
+task="v2_0"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
+num=0
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_changeDetec_atlas_v2added'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+
+
+task="v2_1"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
+num=1
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_changeDetec_atlas_v2added'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+     
+     
+task="v2_2"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
+num=2
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_changeDetec_atlas_v2added'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+     
+     
+task="v2_3"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
+num=3
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_changeDetec_atlas_v2added'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+     
+     
+task="v2_4"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
+num=4
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_changeDetec_atlas_v2added'
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num, \
+     -J ${task} \
+     data_process.pbs
+
+
+task="f32_test0"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
+num=0
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_cluster32_atlas_test'
+frame_method='clustering'
+frame_num=32
+frag_len=224
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num,frame_method=$frame_method,frame_num=$frame_num,frag_len=$frag_len \
+     -J ${task} \
+     data_process.pbs
+
+task="f32_test1"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
+num=1
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_cluster32_atlas_test'
+frame_method='clustering'
+frame_num=32
+frag_len=224
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num,frame_method=$frame_method,frame_num=$frame_num,frag_len=$frag_len \
+     -J ${task} \
+     data_process.pbs
+
+task="f32_test2"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
+num=2
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_cluster32_atlas_test'
+frame_method='clustering'
+frame_num=32
+frag_len=224
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num,frame_method=$frame_method,frame_num=$frame_num,frag_len=$frag_len \
+     -J ${task} \
+     data_process.pbs
+
+task="f32_test3"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
+num=3
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_cluster32_atlas_test'
+frame_method='clustering'
+frame_num=32
+frag_len=224
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num,frame_method=$frame_method,frame_num=$frame_num,frag_len=$frag_len \
+     -J ${task} \
+     data_process.pbs
+
+task="f32_test4"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
+num=4
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_cluster32_atlas_test'
+frame_method='clustering'
+frame_num=32
+frag_len=224
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num,frame_method=$frame_method,frame_num=$frame_num,frag_len=$frag_len \
+     -J ${task} \
+     data_process.pbs
+
+task="f32_v2_0"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
+num=0
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_cluster32_atlas_v2added'
+frame_method='clustering'
+frame_num=32
+frag_len=224
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num,frame_method=$frame_method,frame_num=$frame_num,frag_len=$frag_len \
+     -J ${task} \
+     data_process.pbs
+
+task="f32_v2_1"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
+num=1
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_cluster32_atlas_v2added'
+frame_method='clustering'
+frame_num=32
+frag_len=224
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num,frame_method=$frame_method,frame_num=$frame_num,frag_len=$frag_len \
+     -J ${task} \
+     data_process.pbs
+
+task="f32_v2_2"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
+num=2
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_cluster32_atlas_v2added'
+frame_method='clustering'
+frame_num=32
+frag_len=224
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num,frame_method=$frame_method,frame_num=$frame_num,frag_len=$frag_len \
+     -J ${task} \
+     data_process.pbs
+
+task="f32_v2_3"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
+num=3
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_cluster32_atlas_v2added'
+frame_method='clustering'
+frame_num=32
+frag_len=224
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num,frame_method=$frame_method,frame_num=$frame_num,frag_len=$frag_len \
+     -J ${task} \
+     data_process.pbs
+
+task="f32_v2_4"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
+num=4
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_cluster32_atlas_v2added'
+frame_method='clustering'
+frame_num=32
+frag_len=224
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num,frame_method=$frame_method,frame_num=$frame_num,frag_len=$frag_len \
+     -J ${task} \
+     data_process.pbs
+
+task="f32_data0"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
+num=0
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_cluster32_atlas_data'
+frame_method='clustering'
+frame_num=32
+frag_len=224
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num,frame_method=$frame_method,frame_num=$frame_num,frag_len=$frag_len \
+     -J ${task} \
+     data_process.pbs
+
+task="f32_data1"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
+num=1
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_cluster32_atlas_data'
+frame_method='clustering'
+frame_num=32
+frag_len=224
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num,frame_method=$frame_method,frame_num=$frame_num,frag_len=$frag_len \
+     -J ${task} \
+     data_process.pbs
+
+task="f32_data2"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
+num=2
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_cluster32_atlas_data'
+frame_method='clustering'
+frame_num=32
+frag_len=224
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num,frame_method=$frame_method,frame_num=$frame_num,frag_len=$frag_len \
+     -J ${task} \
+     data_process.pbs
+
+task="f32_data3"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
+num=3
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_cluster32_atlas_data'
+frame_method='clustering'
+frame_num=32
+frag_len=224
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num,frame_method=$frame_method,frame_num=$frame_num,frag_len=$frag_len \
+     -J ${task} \
+     data_process.pbs
+
+task="f32_data4"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
+num=4
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_cluster32_atlas_data'
+frame_method='clustering'
+frame_num=32
+frag_len=224
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num,frame_method=$frame_method,frame_num=$frame_num,frag_len=$frag_len \
+     -J ${task} \
+     data_process.pbs
+
+#===============
+
+task="f64_test0"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
+num=0
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_cluster64_atlas_test'
+frame_method='clustering'
+frame_num=64
+frag_len=256
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num,frame_method=$frame_method,frame_num=$frame_num,frag_len=$frag_len \
+     -J ${task} \
+     data_process.pbs
+
+task="f64_test1"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
+num=1
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_cluster64_atlas_test'
+frame_method='clustering'
+frame_num=64
+frag_len=256
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num,frame_method=$frame_method,frame_num=$frame_num,frag_len=$frag_len \
+     -J ${task} \
+     data_process.pbs
+
+task="f64_test2"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
+num=2
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_cluster64_atlas_test'
+frame_method='clustering'
+frame_num=64
+frag_len=256
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num,frame_method=$frame_method,frame_num=$frame_num,frag_len=$frag_len \
+     -J ${task} \
+     data_process.pbs
+
+task="f64_test3"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
+num=3
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_cluster64_atlas_test'
+frame_method='clustering'
+frame_num=64
+frag_len=256
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num,frame_method=$frame_method,frame_num=$frame_num,frag_len=$frag_len \
+     -J ${task} \
+     data_process.pbs
+
+task="f64_test4"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_test/'
+num=4
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_cluster64_atlas_test'
+frame_method='clustering'
+frame_num=64
+frag_len=256
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num,frame_method=$frame_method,frame_num=$frame_num,frag_len=$frag_len \
+     -J ${task} \
+     data_process.pbs
+
+task="f64_v2_0"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
+num=0
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_cluster64_atlas_v2added'
+frame_method='clustering'
+frame_num=64
+frag_len=256
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num,frame_method=$frame_method,frame_num=$frame_num,frag_len=$frag_len \
+     -J ${task} \
+     data_process.pbs
+
+task="f64_v2_1"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
+num=1
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_cluster64_atlas_v2added'
+frame_method='clustering'
+frame_num=64
+frag_len=256
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num,frame_method=$frame_method,frame_num=$frame_num,frag_len=$frag_len \
+     -J ${task} \
+     data_process.pbs
+
+task="f64_v2_2"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
+num=2
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_cluster64_atlas_v2added'
+frame_method='clustering'
+frame_num=64
+frag_len=256
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num,frame_method=$frame_method,frame_num=$frame_num,frag_len=$frag_len \
+     -J ${task} \
+     data_process.pbs
+
+task="f64_v2_3"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
+num=3
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_cluster64_atlas_v2added'
+frame_method='clustering'
+frame_num=64
+frag_len=256
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num,frame_method=$frame_method,frame_num=$frame_num,frag_len=$frag_len \
+     -J ${task} \
+     data_process.pbs
+
+task="f64_v2_4"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
+num=4
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_cluster64_atlas_v2added'
+frame_method='clustering'
+frame_num=64
+frag_len=256
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num,frame_method=$frame_method,frame_num=$frame_num,frag_len=$frag_len \
+     -J ${task} \
+     data_process.pbs
+
+task="f64_data0"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
+num=0
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_cluster64_atlas_data'
+frame_method='clustering'
+frame_num=64
+frag_len=256
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num,frame_method=$frame_method,frame_num=$frame_num,frag_len=$frag_len \
+     -J ${task} \
+     data_process.pbs
+
+task="f64_data1"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
+num=1
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_cluster64_atlas_data'
+frame_method='clustering'
+frame_num=64
+frag_len=256
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num,frame_method=$frame_method,frame_num=$frame_num,frag_len=$frag_len \
+     -J ${task} \
+     data_process.pbs
+
+task="f64_data2"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
+num=2
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_cluster64_atlas_data'
+frame_method='clustering'
+frame_num=64
+frag_len=256
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num,frame_method=$frame_method,frame_num=$frame_num,frag_len=$frag_len \
+     -J ${task} \
+     data_process.pbs
+
+task="f64_data3"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
+num=3
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_cluster64_atlas_data'
+frame_method='clustering'
+frame_num=64
+frag_len=256
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num,frame_method=$frame_method,frame_num=$frame_num,frag_len=$frag_len \
+     -J ${task} \
+     data_process.pbs
+
+task="f64_data4"
+folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_data/'
+num=4
+split_num=5
+outfolder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_cluster64_atlas_data'
+frame_method='clustering'
+frame_num=64
+frag_len=256
+sbatch --export=folder=$folder,num=$num,outfolder=$outfolder,split_num=$split_num,frame_method=$frame_method,frame_num=$frame_num,frag_len=$frag_len \
      -J ${task} \
      data_process.pbs

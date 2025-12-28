@@ -1090,11 +1090,13 @@ def pdb2seq(pdb_path):
                 # print(f"Chain {chain.id} (segment {poly_index}): {sequence}")
     return sequence
 
-def test_rmsf_cor(val_loader, alphabet, configs, seq_model, n_steps, logging):
+def test_rmsf_cor(val_loader, alphabet, configs, seq_model, n_steps, logging, replicate):
     processed_list=[]
-    rep_norm_list=[]
-    rmsf_list=[]
+    
+    result_list=[]
     for batch in val_loader:
+        rep_norm_list=[]
+        rmsf_list=[]
         pid = batch['pid'][0]
         pid = pid.split('#')[0]
         if pid in processed_list:
@@ -1113,18 +1115,21 @@ def test_rmsf_cor(val_loader, alphabet, configs, seq_model, n_steps, logging):
         residue_norms = np.linalg.norm(seq_emb.cpu(), axis=1)
         rmsf_file = os.path.join(configs.valid_settings.analysis_path, f"{pid}_analysis", f"{pid}_RMSF.tsv")
         df = pd.read_csv(rmsf_file, sep="\t")
-        r1 = df["RMSF_R1"].values
+        rmsf_col_name="RMSF_R"+str(int(replicate)+1)
+        r1 = df[rmsf_col_name].values
         rep_norm_list.extend(residue_norms)
         rmsf_list.extend(r1)
         processed_list.append(pid)
+        corr, _ = spearmanr(rep_norm_list, rmsf_list)
+        result_list.append(corr)
         # print(pid)
         # print(len(sequence))
         # print(len(residue_norms))
         # print(len(r1))
     
-    corr, _ = spearmanr(rep_norm_list, rmsf_list)
-    logging.info(f"step:{n_steps} rmsf_cor:{corr:.4f}")
-    return corr
+    result_mean = np.mean(result_list)
+    logging.info(f"step:{n_steps} rmsf_cor:{result_mean:.4f}")
+    return result_mean
 
 def test_rmsf_cor_mdcath(alphabet, configs, seq_model, n_steps, logging):
     processed_list=[]

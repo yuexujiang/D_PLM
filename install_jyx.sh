@@ -18,7 +18,7 @@ pip install git+https://github.com/katsura-jp/pytorch-cosine-annealing-with-warm
 pip install tensorboard
 pip install python-box
 pip install pandas
-pip install peft
+pip install peft==0.14.0
 pip install -U scikit-learn
 pip install fair-esm
 #pip install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.2.1+cu121.html

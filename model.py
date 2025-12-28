@@ -10,7 +10,10 @@ from torch_geometric.nn import global_mean_pool, global_max_pool, global_add_poo
 from torch_geometric.nn import MessagePassing
 import numpy as np
 from torch_scatter import scatter_mean
-
+from transformers import VivitImageProcessor, VivitModel
+from transformers.models.vivit.modeling_vivit import VivitLayer
+from typing import Optional, Tuple
+from transformers import AutoModel
 
 def set_requires_grad(model, val):
     for p in model.parameters():
@@ -425,6 +428,675 @@ class GVP_lstm(nn.Module):
             return graph_feature, residue_feature, attention_weights
         else:
             return graph_feature, residue_feature
+
+class HoulsbyAdapter(nn.Module):
+    """
+    Houlsby-style bottleneck adapter module.
+    Architecture: LayerNorm -> Down-project -> Non-linearity -> Up-project -> Residual
+    """
+    def __init__(self, hidden_size: int, bottleneck_size: int = 64, non_linearity: str = "gelu"):
+        super().__init__()
+        self.down_proj = nn.Linear(hidden_size, bottleneck_size)
+        self.up_proj = nn.Linear(bottleneck_size, hidden_size)
+        self.layer_norm = nn.LayerNorm(hidden_size)
+        
+        # Non-linearity selection
+        if non_linearity == "gelu":
+            self.act = nn.GELU()
+        elif non_linearity == "relu":
+            self.act = nn.ReLU()
+        elif non_linearity == "silu":
+            self.act = nn.SiLU()
+        else:
+            self.act = nn.GELU()
+        
+        # Houlsby initialization: near-identity at start
+        self._init_weights()
+    
+    def _init_weights(self):
+        # Initialize down projection with small values
+        nn.init.normal_(self.down_proj.weight, std=1e-2)
+        nn.init.zeros_(self.down_proj.bias)
+        # Initialize up projection to near-zero for identity-like behavior
+        nn.init.normal_(self.up_proj.weight, std=1e-2)
+        nn.init.zeros_(self.up_proj.bias)
+    
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        residual = x
+        x = self.layer_norm(x)
+        x = self.down_proj(x)
+        x = self.act(x)
+        x = self.up_proj(x)
+        return x + residual
+
+class VJEPA2LayerWithAdapters(nn.Module):
+    """
+    Modified VJEPA2Layer with Houlsby adapters.
+    
+    Original architecture:
+        norm1 -> attention -> drop_path -> [hidden_states + attention_output]
+        norm2 -> mlp -> [previous_output + mlp_output]
+    
+    With adapters:
+        norm1 -> attention -> drop_path -> [hidden_states + attention_output] -> adapter_attention
+        norm2 -> mlp -> [previous_output + mlp_output] -> adapter_mlp
+    """
+    def __init__(
+        self, 
+        original_layer,
+        bottleneck_size: int = 64, 
+        non_linearity: str = "gelu",
+        dropout: float = 0.0
+    ):
+        super().__init__()
+        
+        # Extract hidden size from attention query projection
+        hidden_size = original_layer.attention.query.in_features
+        
+        # Copy all original components from VJEPA2Layer
+        self.norm1 = original_layer.norm1
+        self.attention = original_layer.attention
+        self.drop_path = original_layer.drop_path
+        self.norm2 = original_layer.norm2
+        self.mlp = original_layer.mlp
+        
+        # Add Houlsby adapters after attention and MLP
+        self.adapter_attention = HoulsbyAdapter(
+            hidden_size, bottleneck_size, non_linearity
+        )
+        self.adapter_mlp = HoulsbyAdapter(
+            hidden_size, bottleneck_size, non_linearity
+        )
+    
+    def forward(
+        self,
+        hidden_states: torch.Tensor,
+        # head_mask: Optional[torch.Tensor] = None,
+        position_bias: Optional[torch.Tensor] = None,
+        output_attentions: bool = False,
+        **kwargs
+    ) -> Tuple[torch.Tensor, ...]:
+        """
+        Forward pass matching VJEPA2Layer structure with adapters.
+        
+        Args:
+            hidden_states: Input tensor (batch_size, sequence_length, hidden_size)
+            head_mask: Optional attention mask
+            output_attentions: Whether to return attention weights
+        """
+        # Attention block with residual
+        attention_output = self.attention(
+            self.norm1(hidden_states),
+            # head_mask=head_mask,
+            output_attentions=output_attentions,
+        )
+        
+        # Handle tuple output from attention
+        if isinstance(attention_output, tuple):
+            if output_attentions:
+                attention_output, attention_weights = attention_output
+            else:
+                attention_output = attention_output[0]
+        
+        # Apply drop_path and residual connection
+        hidden_states = hidden_states + self.drop_path(attention_output)
+        
+        # Insert adapter after attention
+        hidden_states = self.adapter_attention(hidden_states)
+        
+        # MLP block with residual
+        mlp_output = self.mlp(self.norm2(hidden_states))
+        hidden_states = hidden_states + self.drop_path(mlp_output)
+        
+        # Insert adapter after MLP
+        hidden_states = self.adapter_mlp(hidden_states)
+        
+        if output_attentions:
+            return (hidden_states, attention_weights)
+        return (hidden_states,)
+
+
+class VJEPA2WithAdapters(nn.Module):
+    """
+    V-JEPA2 model with Houlsby adapters for parameter-efficient fine-tuning.
+    
+    Supports both feature extraction (VJEPA2Model) and classification 
+    (VJEPA2ForVideoClassification).
+    """
+    def __init__(
+        self,
+        model_name: str = "facebook/vjepa2-vitl-fpc64-256",
+        num_labels: Optional[int] = None,
+        bottleneck_size: int = 64,
+        non_linearity: str = "gelu",
+        dropout: float = 0.0,
+        freeze_base: bool = True,
+        add_classification_head: bool = False
+    ):
+        super().__init__()
+        
+        # Load pretrained V-JEPA2
+        if add_classification_head and num_labels:
+            # self.model = VJEPA2ForVideoClassification.from_pretrained(
+            #     model_name,
+            #     num_labels=num_labels,
+            #     ignore_mismatched_sizes=True
+            # )
+            self.has_classifier = True
+        else:
+            self.model = AutoModel.from_pretrained(model_name)
+            # self.model = VJEPA2Model.from_pretrained(model_name)
+            self.has_classifier = False
+            
+        self.config = self.model.config
+        self.bottleneck_size = bottleneck_size
+        
+        # Add adapters to all encoder layers
+        self._add_adapters_to_encoder(bottleneck_size, non_linearity, dropout)
+        
+        # Freeze base model parameters
+        if freeze_base:
+            self._freeze_base_model()
+    
+    def _add_adapters_to_encoder(
+        self, 
+        bottleneck_size: int, 
+        non_linearity: str,
+        dropout: float
+    ):
+        """
+        Replace each VJEPA2Layer with adapter-augmented version.
+        
+        V-JEPA2 has 24 layers accessed via:
+        - VJEPA2Model: model.encoder.layer
+        - VJEPA2ForVideoClassification: model.vjepa2.encoder.layer
+        """
+        # Get encoder based on model type
+        if self.has_classifier:
+            encoder = self.model.vjepa2.encoder
+        else:
+            encoder = self.model.encoder
+        
+        # Replace each layer
+        num_layers = len(encoder.layer)
+        print(f"Adding adapters to {num_layers} VJEPA2 layers...")
+        
+        for i in range(num_layers):
+            original_layer = encoder.layer[i]
+            encoder.layer[i] = VJEPA2LayerWithAdapters(
+                original_layer, 
+                bottleneck_size, 
+                non_linearity, 
+                dropout
+            )
+            
+        print(f"✓ Successfully added {num_layers * 2} adapters (2 per layer)")
+    
+    def _freeze_base_model(self):
+        """
+        Freeze all parameters except adapters and classification head.
+        
+        Frozen components:
+        - Patch embeddings (Conv3d)
+        - All attention components (query, key, value, proj)
+        - All MLP components (fc1, fc2)
+        - Layer norms (norm1, norm2)
+        - Final layernorm
+        
+        Trainable components:
+        - All adapter parameters
+        - Classification head (if present)
+        """
+        frozen_count = 0
+        trainable_count = 0
+        
+        for name, param in self.model.named_parameters():
+            if "adapter" in name or "classifier" in name or "head" in name:
+                param.requires_grad = True
+                trainable_count += 1
+            else:
+                param.requires_grad = False
+                frozen_count += 1
+        
+        print(f"✓ Frozen {frozen_count} parameter groups")
+        print(f"✓ Trainable {trainable_count} parameter groups (adapters + head)")
+    
+    def unfreeze_layernorm(self):
+        """Optionally unfreeze all layer normalization parameters."""
+        for name, param in self.model.named_parameters():
+            if "norm" in name.lower() or "layernorm" in name.lower():
+                param.requires_grad = True
+    
+    def unfreeze_classifier(self):
+        """Unfreeze the classification head."""
+        if self.has_classifier:
+            for param in self.model.classifier.parameters():
+                param.requires_grad = True
+    
+    def get_trainable_params(self):
+        """Return count and percentage of trainable parameters."""
+        total = sum(p.numel() for p in self.parameters())
+        trainable = sum(p.numel() for p in self.parameters() if p.requires_grad)
+        percentage = 100 * trainable / total if total > 0 else 0
+        return trainable, total, percentage
+    
+    def get_adapter_params(self):
+        """Return only adapter parameters."""
+        adapter_params = sum(
+            p.numel() for name, p in self.named_parameters() 
+            if "adapter" in name
+        )
+        return adapter_params
+    
+    def forward(
+        self, 
+        pixel_values_videos: torch.Tensor,
+        # labels: Optional[torch.Tensor] = None,
+        # output_attentions: bool = False,
+        # output_hidden_states: bool = False,
+        # return_dict: bool = True,
+        **kwargs
+    ):
+        """
+        Forward pass through V-JEPA2 with adapters.
+        
+        Args:
+            pixel_values_videos: Video tensor of shape 
+                (batch_size, num_frames, num_channels, height, width)
+            labels: Optional labels for classification
+            output_attentions: Whether to return attention weights
+            output_hidden_states: Whether to return all hidden states
+            return_dict: Whether to return a dict or tuple
+        """
+        # return self.model(
+        #     pixel_values_videos=pixel_values_videos,
+        #     labels=labels,
+        #     output_attentions=output_attentions,
+        #     output_hidden_states=output_hidden_states,
+        #     return_dict=return_dict,
+        # )
+        return self.model.get_vision_features(pixel_values_videos) #[B, token_len, dim] there is no cls
+
+
+# =============================================================================
+# Utility Functions
+# =============================================================================
+
+def create_vjepa2_with_adapters(
+    model_name: str = "facebook/vjepa2-vitl-fpc64-256",
+    num_labels: Optional[int] = None,
+    bottleneck_size: int = 64,
+    non_linearity: str = "gelu",
+    dropout: float = 0.0,
+    add_classification_head: bool = False,
+    verbose: bool = True
+) -> VJEPA2WithAdapters:
+    """
+    Factory function to create V-JEPA2 with Houlsby adapters.
+    
+    Args:
+        model_name: HuggingFace model identifier
+        num_labels: Number of classes for classification
+        bottleneck_size: Adapter bottleneck dimension (32, 64, 128, 256)
+        non_linearity: Activation function ('gelu', 'relu', 'silu', 'tanh')
+        dropout: Dropout rate in adapters (0.0 to 0.2 recommended)
+        add_classification_head: Whether to add classification head
+        verbose: Print detailed information
+    """
+    if verbose:
+        print("\n" + "="*70)
+        print("Creating V-JEPA2 Model with Houlsby Adapters")
+        print("="*70)
+        print(f"Model: {model_name}")
+        print(f"Bottleneck size: {bottleneck_size}")
+        print(f"Non-linearity: {non_linearity}")
+        print(f"Dropout: {dropout}")
+        print(f"Classification head: {add_classification_head}")
+        if add_classification_head:
+            print(f"Number of labels: {num_labels}")
+        print("-"*70)
+    
+    model = VJEPA2WithAdapters(
+        model_name=model_name,
+        num_labels=num_labels,
+        bottleneck_size=bottleneck_size,
+        non_linearity=non_linearity,
+        dropout=dropout,
+        freeze_base=True,
+        add_classification_head=add_classification_head
+    )
+    
+    # if verbose:
+    #     print_model_summary(model)
+    
+    return model
+
+class VJEPA2_tune(nn.Module):  # embedding table is fixed
+    def __init__(self,
+                 configs,
+                 dim_mlp = 768,
+                 protein_out_dim=256,
+                 protein_inner_dim=4096, 
+                 protein_num_projector=2):
+        """
+        unfix_last_layer: the number of layers that can be fine-tuned
+        """
+        super(VJEPA2_tune, self).__init__()
+        # self.image_processor = VivitImageProcessor.from_pretrained(vivit_pretrain)
+        # self.model = VivitModel.from_pretrained(vivit_pretrain, cache_dir=configs.HF_cache_path)
+
+        # dim_mlp = 768
+        
+        self.projectors_protein = MoBYMLP(in_dim=dim_mlp, inner_dim=protein_inner_dim, out_dim=protein_out_dim,
+                                          num_layers=protein_num_projector)
+
+        # self.projectors_residue = MoBYMLP(in_dim=dim_mlp, inner_dim=residue_inner_dim, out_dim=residue_out_dim,
+        #                                   num_layers=residue_num_projector)
+        
+        # self.model = VivitModel.from_pretrained(configs.model.MD_encoder.model_name)
+        if configs.model.MD_encoder.fine_tuning.enable:
+            self.model = AutoModel.from_pretrained(configs.model.MD_encoder.model_name)
+            unfix_last_layer = configs.model.MD_encoder.fine_tuning.unfix_last_layer
+            fix_layer_num = self.model.config.num_hidden_layers - unfix_last_layer
+            fix_layer_index = 0
+            for layer in self.model.encoder.layer:  # only fine-tune transformer layers,no contact_head and other parameters
+                if fix_layer_index < fix_layer_num:
+                    for p in layer.parameters():
+                    # logging.info('unfix layer')
+                        p.requires_grad = False
+                    fix_layer_index += 1  # keep these layers frozen
+                    continue
+
+                for p in layer.parameters():
+                    # logging.info('unfix layer')
+                    p.requires_grad = True
+
+        elif configs.model.MD_encoder.adapter_h.enable:
+            self.model = create_vjepa2_with_adapters(
+                model_name="facebook/vjepa2-vitl-fpc64-256",
+                # num_labels=10,  # Your target number of classes
+                bottleneck_size=64,  # Adapter bottleneck dimension
+                non_linearity="gelu"
+            )
+        self.configs = configs
+
+        # if hasattr(configs.model.MD_encoder, "fine_tuning") and not configs.model.MD_encoder.fine_tuning.enable:
+        #     for name, param in self.model.named_parameters():
+        #         param.requires_grad = False
+
+        if hasattr(configs.model.MD_encoder, "fine_tuning_projct") and not configs.model.MD_encoder.fine_tuning_projct.enable:
+            for name, param in self.projectors_protein.named_parameters():
+                param.requires_grad = False
+            
+            # for name, param in self.projectors_residue.named_parameters():
+            #     param.requires_grad = False
+
+    def forward(self, x, return_logits=False, return_embedding=False): # x shape [batch, 32, 3, 224, 224]
+        #outputs = self.model(x)
+        # print("OKOKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK")
+        if return_logits:
+            # prediction_scores = outputs["logits"]
+            # return prediction_scores
+            print("print something")
+        else:
+            # last_hidden_states = outputs.last_hidden_state # [batch, 3137, 768]
+            # cls_representation = last_hidden_states[:, 0, :] # [batch, 768]
+            if self.configs.model.MD_encoder.fine_tuning.enable:
+                output = self.model.get_vision_features(x)
+            elif self.configs.model.MD_encoder.adapter_h.enable:
+                output = self.model(x) #[batch, token_len=8192, dim=1024]. no cls
+            # last_hidden_states = vivit_output.last_hidden_state #[batch, 3137, 768]
+            representation = torch.mean(output, dim=1) #[batch, 1024]
+
+            graph_feature = self.projectors_protein(representation)
+
+        if return_embedding:
+            return graph_feature, representation
+        else:
+            return graph_feature
+
+class VivitLayerWithAdapters(nn.Module):
+    """
+    Modified ViViT layer with Houlsby adapters inserted after attention and FFN.
+    """
+    def __init__(self, original_layer: VivitLayer, bottleneck_size: int = 64, non_linearity: str = "gelu"):
+        super().__init__()
+        hidden_size = original_layer.attention.attention.all_head_size
+        
+        # Copy original components
+        self.attention = original_layer.attention
+        self.intermediate = original_layer.intermediate
+        self.output = original_layer.output
+        self.layernorm_before = original_layer.layernorm_before
+        self.layernorm_after = original_layer.layernorm_after
+        
+        # Add adapters after attention and FFN
+        self.adapter_attention = HoulsbyAdapter(hidden_size, bottleneck_size, non_linearity)
+        self.adapter_ffn = HoulsbyAdapter(hidden_size, bottleneck_size, non_linearity)
+    
+    def forward(self, hidden_states, head_mask=None, output_attentions=False):
+        # Self-attention with pre-norm
+        self_attention_outputs = self.attention(
+            self.layernorm_before(hidden_states),
+            head_mask=head_mask,
+            output_attentions=output_attentions,
+        )
+        attention_output = self_attention_outputs[0]
+        outputs = self_attention_outputs[1:]
+        
+        # First residual + adapter after attention
+        hidden_states = attention_output + hidden_states
+        hidden_states = self.adapter_attention(hidden_states)
+        
+        # FFN with pre-norm
+        layer_output = self.layernorm_after(hidden_states)
+        layer_output = self.intermediate(layer_output)
+        layer_output = self.output(layer_output, hidden_states)
+        
+        # Adapter after FFN
+        layer_output = self.adapter_ffn(layer_output)
+        
+        outputs = (layer_output,) + outputs
+        return outputs
+
+
+class VivitWithAdapters(nn.Module):
+    """
+    ViViT model with Houlsby adapters for parameter-efficient fine-tuning.
+    Freezes the base model and only trains adapter parameters.
+    """
+    def __init__(
+        self,
+        model_name: str = "google/vivit-b-16x2-kinetics400",
+        # num_labels: int = 400,
+        bottleneck_size: int = 64,
+        non_linearity: str = "gelu",
+        freeze_base: bool = True,
+        num_layers: int =4
+    ):
+        super().__init__()
+        
+        # Load pretrained ViViT
+        # self.vivit = VivitForVideoClassification.from_pretrained(
+        self.vivit = VivitModel.from_pretrained(
+            model_name,
+            # num_labels=num_labels,
+            ignore_mismatched_sizes=True
+        )
+        self.config = self.vivit.config
+        self.bottleneck_size = bottleneck_size
+        
+        # Replace layers with adapter-augmented versions
+        self._add_adapters(bottleneck_size, non_linearity, num_layers)
+        
+        # Freeze base model parameters
+        if freeze_base:
+            self._freeze_base_model()
+    
+    def _add_adapters(self, bottleneck_size: int, non_linearity: str, num_layers: int):
+        """Replace each VivitLayer with adapter-augmented version."""
+        fix_layer_num = self.vivit.config.num_hidden_layers - num_layers
+        for i, layer in enumerate(self.vivit.encoder.layer):
+            if i < fix_layer_num:
+                continue
+            else:
+                self.vivit.encoder.layer[i] = VivitLayerWithAdapters(
+                    layer, bottleneck_size, non_linearity
+                )
+    
+    def _freeze_base_model(self):
+        """Freeze all parameters except adapters and classification head."""
+        for name, param in self.vivit.named_parameters():
+            if "adapter" not in name and "classifier" not in name:
+                param.requires_grad = False
+        for p in self.vivit.layernorm.parameters():
+            p.requires_grad = True
+    
+    def unfreeze_classifier(self):
+        """Optionally unfreeze the classification head."""
+        for param in self.vivit.classifier.parameters():
+            param.requires_grad = True
+        
+    
+    def get_trainable_params(self):
+        """Return count and percentage of trainable parameters."""
+        total = sum(p.numel() for p in self.parameters())
+        trainable = sum(p.numel() for p in self.parameters() if p.requires_grad)
+        return trainable, total, 100 * trainable / total
+    
+    def forward(self, pixel_values, labels=None, **kwargs):
+        # return self.vivit(pixel_values=pixel_values, labels=labels, **kwargs)
+        return self.vivit(pixel_values=pixel_values, **kwargs)
+
+
+# =============================================================================
+# Training utilities
+# =============================================================================
+
+def create_adapter_vivit(
+    model_name: str = "google/vivit-b-16x2-kinetics400",
+    num_labels: int = 10,
+    bottleneck_size: int = 64,
+    non_linearity: str = "gelu",
+    num_layers: int = 4
+) -> VivitWithAdapters:
+    """Factory function to create ViViT with adapters."""
+    model = VivitWithAdapters(
+        model_name=model_name,
+        # num_labels=num_labels,
+        bottleneck_size=bottleneck_size,
+        non_linearity=non_linearity,
+        freeze_base=True,
+        num_layers=num_layers
+    )
+    trainable, total, pct = model.get_trainable_params()
+    print(f"Trainable params: {trainable:,} / {total:,} ({pct:.2f}%)")
+    return model
+
+class VIVIT_tune(nn.Module):  # embedding table is fixed
+    def __init__(self, vivit_pretrain, logging,
+                 accelerator,
+                 configs,
+                 dim_mlp = 768,
+                 residue_inner_dim=4096,
+                 residue_out_dim=256,
+                 protein_out_dim=256,
+                 residue_num_projector=2,
+                 protein_inner_dim=4096, protein_num_projector=2):
+        """
+        unfix_last_layer: the number of layers that can be fine-tuned
+        """
+        super(VIVIT_tune, self).__init__()
+        # self.image_processor = VivitImageProcessor.from_pretrained(vivit_pretrain)
+        # self.model = VivitModel.from_pretrained(vivit_pretrain, cache_dir=configs.HF_cache_path)
+
+        # dim_mlp = 768
+        
+        self.projectors_protein = MoBYMLP(in_dim=dim_mlp, inner_dim=protein_inner_dim, out_dim=protein_out_dim,
+                                          num_layers=protein_num_projector)
+
+        # self.projectors_residue = MoBYMLP(in_dim=dim_mlp, inner_dim=residue_inner_dim, out_dim=residue_out_dim,
+        #                                   num_layers=residue_num_projector)
+        
+        # self.model = VivitModel.from_pretrained(configs.model.MD_encoder.model_name)
+        if configs.model.MD_encoder.fine_tuning.enable:
+            self.model = VivitModel.from_pretrained(configs.model.MD_encoder.model_name)
+            unfix_last_layer = configs.model.MD_encoder.fine_tuning.unfix_last_layer
+            fix_layer_num = self.model.config.num_hidden_layers - unfix_last_layer
+            fix_layer_index = 0
+            for layer in self.model.encoder.layer:  # only fine-tune transformer layers,no contact_head and other parameters
+                if fix_layer_index < fix_layer_num:
+                    for p in layer.parameters():
+                    # logging.info('unfix layer')
+                        p.requires_grad = False
+                    fix_layer_index += 1  # keep these layers frozen
+                    continue
+
+                for p in layer.parameters():
+                    # logging.info('unfix layer')
+                    p.requires_grad = True
+
+        elif configs.model.MD_encoder.adapter_h.enable:
+            self.model = create_adapter_vivit(
+                model_name="google/vivit-b-16x2-kinetics400",
+                # num_labels=10,  # Your target number of classes
+                bottleneck_size=128,  # Adapter bottleneck dimension
+                non_linearity="gelu",
+                num_layers=configs.model.MD_encoder.adapter_h.num_end_adapter_layers
+            )
+        elif configs.model.MD_encoder.lora.enable:
+            self.model = VivitModel.from_pretrained(configs.model.MD_encoder.model_name)
+            lora_targets =  ["attention.attention.query", "attention.attention.key",
+                              "attention.attention.value","attention.output.dense"]
+            target_modules=[]
+            if configs.model.MD_encoder.lora.num_end_lora > 0:
+                start_layer_idx = np.max([self.model.config.num_hidden_layers - configs.model.MD_encoder.lora.num_end_lora, 0])
+                for idx in range(start_layer_idx, self.model.config.num_hidden_layers):
+                    for layer_name in lora_targets:
+                        target_modules.append(f"encoder.layer.{idx}.{layer_name}")
+                
+            peft_config = LoraConfig(
+                inference_mode=False,
+                r=configs.model.MD_encoder.lora.r,
+                lora_alpha=configs.model.MD_encoder.lora.alpha,
+                target_modules=target_modules,
+                lora_dropout=configs.model.MD_encoder.lora.dropout,
+                bias="none",
+                # modules_to_save=modules_to_save
+            )
+            self.peft_model = get_peft_model(self.model, peft_config)
+
+        # if hasattr(configs.model.MD_encoder, "fine_tuning") and not configs.model.MD_encoder.fine_tuning.enable:
+        #     for name, param in self.model.named_parameters():
+        #         param.requires_grad = False
+
+        if hasattr(configs.model.MD_encoder, "fine_tuning_projct") and not configs.model.MD_encoder.fine_tuning_projct.enable:
+            for name, param in self.projectors_protein.named_parameters():
+                param.requires_grad = False
+            
+            # for name, param in self.projectors_residue.named_parameters():
+            #     param.requires_grad = False
+
+    def forward(self, x, return_logits=False, return_embedding=False): # x shape [batch, 32, 3, 224, 224]
+        #outputs = self.model(x)
+        # print("OKOKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK")
+        if return_logits:
+            # prediction_scores = outputs["logits"]
+            # return prediction_scores
+            print("print something")
+        else:
+            # last_hidden_states = outputs.last_hidden_state # [batch, 3137, 768]
+            # cls_representation = last_hidden_states[:, 0, :] # [batch, 768]
+            vivit_output = self.model(x) # 
+            last_hidden_states = vivit_output.last_hidden_state #[batch, 3137, 768]
+            cls_representation = last_hidden_states[:, 0, :] #[1, 768]
+
+            graph_feature = self.projectors_protein(cls_representation)
+
+        if return_embedding:
+            return graph_feature, cls_representation
+        else:
+            return graph_feature
 
 class VIVIT(nn.Module):  # embedding table is fixed
     def __init__(self, vivit_pretrain, logging,
@@ -1212,7 +1884,8 @@ class SimCLR(nn.Module):
             return self.model_seq(batch_tokens, return_embedding=return_embedding,return_logits=return_logits)
         elif mode == 'structure':
             return self.model_x(graph, return_embedding=return_embedding)
-        elif mode =="MD" or mode =='vivit':
+        elif mode =="MD" or mode =='vivit' or mode == 'MD_tune' or \
+            mode == "VJEPA2_tune":
             return self.model_x(graph)
         elif mode == 'DCCM_GNN':
             return self.model_x(graph, return_embedding=return_embedding)
@@ -1225,10 +1898,18 @@ class SimCLR(nn.Module):
                 features_seq, residue_seq = self.model_seq(batch_tokens)
                 features_struct, residue_struct = self.model_x(graph)
                 return features_struct, residue_struct, features_seq, residue_seq
-            if self.configs.model.X_module == "MD" or self.configs.model.X_module == "vivit":
-                features_seq, residue_seq = self.model_seq(batch_tokens)
+            if self.configs.model.X_module == "MD" or \
+                self.configs.model.X_module == "vivit" or \
+                    self.configs.model.X_module == "MD_tune" or \
+                        self.configs.model.X_module == "VJEPA2_tune":
+                
                 features_MD = self.model_x(graph)
-                return features_MD, features_seq, residue_seq
+                if return_embedding:
+                    features_seq, residue_seq, graph_feature_embedding, residue_feature_embedding = self.model_seq(batch_tokens, return_embedding=return_embedding)
+                    return features_MD, features_seq, residue_seq, graph_feature_embedding, residue_feature_embedding
+                else:
+                    features_seq, residue_seq = self.model_seq(batch_tokens)
+                    return features_MD, features_seq, residue_seq
             if self.configs.model.X_module == "DCCM_GNN":
                 features_seq, residue_seq = self.model_seq(batch_tokens)
                 protein_MD_feature, residue_MD_feature = self.model_x(graph)
@@ -1258,7 +1939,9 @@ class SimCLR(nn.Module):
         if self.configs.model.X_module == "structure":
             features_struct, residue_struct = self.model_x(graph)
             return features_struct, residue_struct
-        if self.configs.model.X_module == "MD":
+        if self.configs.model.X_module == "MD" or \
+            self.configs.model.X_module == "MD_tune" or \
+                self.configs.model.X_module == "VJEPA2_tune":
             features_MD = self.model_x(graph)
             return features_MD
         if self.configs.model.X_module == "DCCM_GNN":
@@ -1836,6 +2519,36 @@ def prepare_models(logging, configs, accelerator):
                      residue_num_projector=configs.model.residue_num_projector,
                      protein_num_projector=configs.model.protein_num_projector,
                      configs=configs, logging=logging,
+                     dim_mlp=configs.model.MD_encoder.dim_mlp)
+        
+        if accelerator.is_main_process:
+          print_trainable_parameters(model_seq, logging)
+          print_trainable_parameters(model_MD, logging)
+        
+        simclr = SimCLR(model_seq, model_MD, configs=configs)
+    elif configs.model.X_module == "MD_tune":
+        model_MD = VIVIT_tune(configs.model.MD_encoder.model_name,
+                     accelerator=accelerator,
+                     residue_inner_dim=configs.model.MD_encoder.residue_inner_dim,
+                     protein_inner_dim=configs.model.MD_encoder.protein_inner_dim,
+                     residue_out_dim=configs.model.residue_out_dim,
+                     protein_out_dim=configs.model.protein_out_dim,
+                     residue_num_projector=configs.model.residue_num_projector,
+                     protein_num_projector=configs.model.protein_num_projector,
+                     configs=configs, logging=logging,
+                     dim_mlp=configs.model.MD_encoder.dim_mlp)
+        
+        if accelerator.is_main_process:
+          print_trainable_parameters(model_seq, logging)
+          print_trainable_parameters(model_MD, logging)
+        
+        simclr = SimCLR(model_seq, model_MD, configs=configs)
+    elif configs.model.X_module == "VJEPA2_tune":
+        model_MD = VJEPA2_tune(
+                     protein_inner_dim=configs.model.MD_encoder.protein_inner_dim,
+                     protein_out_dim=configs.model.protein_out_dim,
+                     protein_num_projector=configs.model.protein_num_projector,
+                     configs=configs,
                      dim_mlp=configs.model.MD_encoder.dim_mlp)
         
         if accelerator.is_main_process:

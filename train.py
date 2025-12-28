@@ -18,6 +18,7 @@ from utils.evaluation import evaluate_with_deaminase, evaluate_with_kinase, eval
                              evaluate_with_deaminase_md, evaluate_with_kinase_md, evaluate_with_cath_more_md, test_DMS, \
                              test_rmsf_cor
 from utils.cath_with_struct import evaluate_with_cath_more_struct
+import pandas as pd
 
 
 #def prepare_loss(features_struct, features_seq, residue_struct, residue_seq, plddt_residue, criterion, loss,
@@ -519,6 +520,48 @@ def training_loop_Geom2ve_tematt(simclr, start_step, train_loader, val_loader, t
 
     return n_steps, accelerator, optimizer_x, optimizer_seq, scheduler_x, scheduler_seq
 
+def soft_rank(x, tau=1.0):
+    """Compute soft ranking using sigmoid approximation"""
+    x = x.unsqueeze(0)  # (1, N)
+    diff = x.T - x  # (N, N)
+    P = torch.sigmoid(diff / tau)
+    return P.sum(dim=1) + 1
+
+def soft_spearman(pred, target, tau=1.0):
+    """Compute differentiable Spearman correlation"""
+    if pred.std() < 1e-6 or target.std() < 1e-6:
+        # Return 0 correlation if no variance (will result in loss of 1.0, which is ignored)
+        return torch.tensor(0.0, device=pred.device)
+    
+    pr = soft_rank(pred, tau)
+    tr = soft_rank(target, tau)
+
+    pr = pr - pr.mean()
+    tr = tr - tr.mean()
+
+    numerator = (pr * tr).sum()
+    pr_norm = torch.sqrt((pr ** 2).sum())
+    tr_norm = torch.sqrt((tr ** 2).sum())
+    
+    # Check for zero norms
+    if pr_norm < 1e-6 or tr_norm < 1e-6:
+        return torch.tensor(0.0, device=pred.device)
+    
+    denominator = pr_norm * tr_norm + 1e-8
+    
+    # Clamp to avoid numerical issues
+    corr = numerator / denominator
+    corr = torch.clamp(corr, -1.0, 1.0)
+    return corr
+
+def soft_spearman_loss(pred, target, tau=1.0):
+    """Loss version: 1 - correlation"""
+    corr = soft_spearman(pred, target, tau)
+    # If correlation is 0 (invalid), return 0 loss so it doesn't contribute
+    if torch.abs(corr) < 1e-6:
+        return torch.tensor(0.0, device=pred.device, requires_grad=True)
+    return 1.0 - corr
+
 def prepare_loss_MD(simclr,traj,batch_tokens,criterion, loss,
                  accelerator, configs,
                  masked_lm_data_collator
@@ -526,8 +569,8 @@ def prepare_loss_MD(simclr,traj,batch_tokens,criterion, loss,
     
     #simclr_loss, MLM_loss,simclr_residue_loss, logits, labels, logits_residue, labels_residue = 0,0,0,0,0,0,0
     MLM_loss=0
-    features_MD, features_seq, residue_seq = simclr(
-                    graph=traj, batch_tokens=batch_tokens)
+    features_MD, features_seq, residue_seq, graph_feature_embedding, residue_feature_embedding = simclr(
+                    graph=traj, batch_tokens=batch_tokens, return_embedding=True)
     
     # residue_struct, residue_seq, plddt_residue = residue_batch_sample(
     #                 residue_struct, residue_seq, plddt,
@@ -552,6 +595,7 @@ def prepare_loss_MD(simclr,traj,batch_tokens,criterion, loss,
     simclr_loss = torch.mean(criterion(logits, labels))
     # loss += simclr_loss + simclr_residue_loss
     loss += simclr_loss
+
     if hasattr(configs.model.esm_encoder,"MLM"):
         if configs.model.esm_encoder.MLM.enable:
             # make masked input and label
@@ -627,8 +671,7 @@ def training_loop_MD(simclr, start_step, start_dms, start_loss, start_rmsf, trai
                         simclr,trajs,batch_tokens,criterion,loss, accelerator, configs,
                         masked_lm_data_collator
                         )
-                    
-
+                
                 # Gather the losses across all processes for logging (if we use distributed training).
                 avg_loss = accelerator.gather(loss.repeat(configs.train_settings.batch_size)).mean()
                 train_loss += avg_loss.item() / configs.train_settings.gradient_accumulation
@@ -690,7 +733,7 @@ def training_loop_MD(simclr, start_step, start_dms, start_loss, start_rmsf, trai
                                      best_val_dms_corr, val_DMS_corr, 'best_val_dms_corr', direction='high')
                     
                     val_rmsf_cor = test_rmsf_cor(val_loader, simclr.model_seq.alphabet, configs, simclr.model_seq.esm2,
-                                                 n_steps, logging)
+                                                 n_steps, logging, replicate)
                     val_rmsf_cor = abs(val_rmsf_cor)
                     best_val_rmsf_cor = save_best_checkpoints(accelerator.unwrap_model(optimizer_x),
                                      accelerator.unwrap_model(optimizer_seq),
@@ -1269,6 +1312,10 @@ def main(args, dict_configs, config_file_path):
             simclr,start_step = load_checkpoints(simclr, configs, 
                             optimizer_seq,optimizer_x,scheduler_seq,scheduler_x,
                             logging,resume_path=configs.resume.result_path,restart_optimizer=configs.resume.restart_optimizer)
+        if configs.model.X_module == "MD_tune":
+            print("to do ...")
+        if configs.model.X_module == "VJEPA2_tune":
+            print("to do ...")
         if configs.model.X_module == 'DCCM_GNN':
             print("to do...")
             #xxx
@@ -1294,6 +1341,17 @@ def main(args, dict_configs, config_file_path):
 
     if configs.model.X_module == 'MD':
         from data.data_MD import prepare_dataloaders
+        ((train_dataloader_repli_0, val_dataloader_repli_0, test_dataloader_repli_0),
+         (train_dataloader_repli_1, val_dataloader_repli_1, test_dataloader_repli_1),
+         (train_dataloader_repli_2, val_dataloader_repli_2, test_dataloader_repli_2)) = prepare_dataloaders(configs)
+        # val_loader = prepare_dataloaders_v2(configs)
+        ((train_dataloader_repli_0, val_dataloader_repli_0, test_dataloader_repli_0),
+        (train_dataloader_repli_1, val_dataloader_repli_1, test_dataloader_repli_1),
+        (train_dataloader_repli_2, val_dataloader_repli_2, test_dataloader_repli_2))=accelerator.prepare(((train_dataloader_repli_0, val_dataloader_repli_0, test_dataloader_repli_0),
+                                                                                                        (train_dataloader_repli_1, val_dataloader_repli_1, test_dataloader_repli_1),
+                                                                                                        (train_dataloader_repli_2, val_dataloader_repli_2, test_dataloader_repli_2)))
+    if configs.model.X_module == 'MD_tune' or configs.model.X_module == 'VJEPA2_tune':
+        from data.data_MD_v2 import prepare_dataloaders
         ((train_dataloader_repli_0, val_dataloader_repli_0, test_dataloader_repli_0),
          (train_dataloader_repli_1, val_dataloader_repli_1, test_dataloader_repli_1),
          (train_dataloader_repli_2, val_dataloader_repli_2, test_dataloader_repli_2)) = prepare_dataloaders(configs)
@@ -1376,7 +1434,9 @@ def main(args, dict_configs, config_file_path):
             configs.model.X_module == 'DCCM_GNN' or \
                 configs.model.X_module == 'Geom2vec_tematt' or \
                     configs.model.X_module == 'Geom2vec_temlstmatt' or \
-                        configs.model.X_module == 'vivit':
+                        configs.model.X_module == 'vivit' or \
+                            configs.model.X_module == 'MD_tune' or \
+                                configs.model.X_module == 'VJEPA2_tune':
             train_steps = np.ceil(len(train_dataloader_repli_0) / configs.train_settings.gradient_accumulation)
             train_steps = train_steps * 3
         logging.info(f'Number of train steps per epoch: {int(train_steps)}')
@@ -1410,7 +1470,8 @@ def main(args, dict_configs, config_file_path):
             result_path, logging, configs, replicate=2, masked_lm_data_collator=masked_lm_data_collator, accelerator=accelerator
         )
 
-    elif configs.model.X_module == 'MD' or configs.model.X_module == 'vivit':
+    elif configs.model.X_module == 'MD' or configs.model.X_module == 'vivit' or \
+        configs.model.X_module == 'MD_tune' or configs.model.X_module == 'VJEPA2_tune':
         start_step, accelerator, optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, best_dms, best_loss, best_rmsf = training_loop_MD(
             simclr, start_step, 0.0, np.inf, 0.0, train_dataloader_repli_0, val_dataloader_repli_0, test_dataloader_repli_0, batch_converter, criterion,
             optimizer_x, optimizer_seq, scheduler_x, scheduler_seq, train_writer, valid_writer,

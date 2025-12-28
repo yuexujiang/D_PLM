@@ -13,6 +13,7 @@ from timm import optim
 from torch.utils.tensorboard import SummaryWriter
 from cosine_annealing_warmup import CosineAnnealingWarmupRestarts
 import ast
+from collections import OrderedDict
 
 def prepare_tensorboard(result_path):
     train_path = os.path.join(result_path, 'train')
@@ -318,10 +319,44 @@ def load_checkpoints_md(simclr, configs,
     logging.info(f"load checkpoints from {resume_path}")
     
     if "state_dict1" in checkpoint: 
-        simclr.model_seq.load_state_dict(checkpoint['state_dict1'])
+        if  any('adapter' in name for name, _ in simclr.model_seq.named_modules()):
+                if np.sum(["adapter_layer_dict" in key for key in checkpoint[
+                    'state_dict1'].keys()]) == 0:  # using old checkpoints, need to rename the adapter_layer into adapter_layer_dict.adapter_0
+                    new_ordered_dict = OrderedDict()
+                    for key, value in checkpoint['state_dict1'].items():
+                        if "adapter_layer_dict" not in key:
+                            new_key = key.replace('adapter_layer', 'adapter_layer_dict.adapter_0')
+                            new_ordered_dict[new_key] = value
+                        else:
+                            new_ordered_dict[key] = value
+                    
+                    simclr.model_seq.load_state_dict(new_ordered_dict, strict=False)
+                else:
+                    simclr.model_seq.load_state_dict(checkpoint['state_dict1'], strict=False)
+        else:
+            simclr.model_seq.load_state_dict(checkpoint['state_dict1'], strict=False)
+        #         else:
+        #             #this model does not contain esm2
+        #             new_ordered_dict = OrderedDict()
+        #             for key, value in checkpoint['state_dict1'].items():
+        #                     key = key.replace("esm2.","")
+        #                     new_ordered_dict[key] = value
+                    
+        #             simclr.model_seq.load_state_dict(new_ordered_dict, strict=False)
+        # # simclr.model_seq.load_state_dict(checkpoint['state_dict1'])
+        # # elif  any('lora' in name for name, _ in model.named_modules()):
+        # else:
+        #         #this model does not contain esm2
+        #         new_ordered_dict = OrderedDict()
+        #         for key, value in checkpoint['state_dict1'].items():
+        #                 print(key)
+        #                 key = key.replace("esm2.","")
+        #                 new_ordered_dict[key] = value
+                
+        #         simclr.model_seq.load_state_dict(new_ordered_dict, strict=False)
     
     if "state_x" in checkpoint:
-         simclr.model_x.load_state_dict(checkpoint['state_x'])
+         simclr.model_x.load_state_dict(checkpoint['state_x'], strict=False)
     
     if 'step' in checkpoint:
         if not restart_optimizer:

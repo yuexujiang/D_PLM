@@ -53,7 +53,8 @@ def load_checkpoints(model,checkpoint_path):
                             new_ordered_dict[key] = value
                     
                     model.load_state_dict(new_ordered_dict, strict=False)
-            elif  any('lora' in name for name, _ in model.named_modules()):
+            # elif  any('lora' in name for name, _ in model.named_modules()):
+            else:
                 #this model does not contain esm2
                 new_ordered_dict = OrderedDict()
                 for key, value in checkpoint['state_dict1'].items():
@@ -62,6 +63,7 @@ def load_checkpoints(model,checkpoint_path):
                         new_ordered_dict[key] = value
                 
                 model.load_state_dict(new_ordered_dict, strict=False)
+
             
             print("checkpoints were loaded from " + checkpoint_path)
         else:
@@ -98,6 +100,11 @@ def create_parser():
     "--config-path",
     type=str,
     default="/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/dplm_mlm/config_mlm.yaml"
+    )
+    parser.add_argument(
+    "--project-path",
+    type=str,
+    default="/cluster/pixstor/xudong-lab/yuexu/D_PLM/"
     )
     parser.add_argument(
         "--model-type",
@@ -543,24 +550,24 @@ if __name__ == "__main__":
       elif args.model_type == "ESM-1v":
            args.modelname = "ESM-1v"
       
-      args.dms_output = "/cluster/pixstor/xudong-lab/yuexu/D_PLM/ESM_1v_data/results/"+args.modelname
+      args.dms_output = args.project_path+"ESM_1v_data/results/"+args.modelname
       args.model,args.alphabet = load_model(args)
       pathlib.Path(args.dms_output).mkdir(parents=True, exist_ok=True)
       args.logging = get_logging(args.dms_output)
       
-      outputfilename = os.path.join("/cluster/pixstor/xudong-lab/yuexu/D_PLM/ESM_1v_data/results/",'ESM-1v_data_summary_start_end_seq_splm_esm2.csv')
+      outputfilename = os.path.join(args.project_path,"ESM_1v_data/results/",'ESM-1v_data_summary_start_end_seq_splm_esm2.csv')
       import shutil
       
       if os.path.exists(outputfilename):
           methodname=args.model_location.split("/")[-3]
-          newname = os.path.join("/cluster/pixstor/xudong-lab/yuexu/D_PLM/ESM_1v_data/results/", f"{methodname}.csv")
+          newname = os.path.join(args.project_path,"ESM_1v_data/results/", f"{methodname}.csv")
           shutil.copy(outputfilename, newname)
           outputfilename = newname
           df=pd.read_csv(outputfilename)
       else:
           methodname=args.model_location.split("/")[-3]
-          newname = os.path.join("/cluster/pixstor/xudong-lab/yuexu/D_PLM/ESM_1v_data/data_wedownloaded/41 mutation dataset/", f"{methodname}.csv")
-          shutil.copy("/cluster/pixstor/xudong-lab/yuexu/D_PLM/ESM_1v_data/data_wedownloaded/41 mutation dataset/ESM-1v_data_summary_start_end_seq.csv", newname)
+          newname = os.path.join(args.project_path,"ESM_1v_data/data_wedownloaded/41 mutation dataset/", f"{methodname}.csv")
+          shutil.copy(args.project_path+"ESM_1v_data/data_wedownloaded/41 mutation dataset/ESM-1v_data_summary_start_end_seq.csv", newname)
           outputfilename = newname
           df=pd.read_csv(outputfilename)
         #   df = pd.read_csv("/cluster/pixstor/xudong-lab/yuexu/D_PLM/ESM_1v_data/data_wedownloaded/41 mutation dataset/ESM-1v_data_summary_start_end_seq.csv")
@@ -587,8 +594,8 @@ if __name__ == "__main__":
             # else:
             #     df.loc[index,args.modelname+"-"+args.scoring_strategy] = 0
             continue
-        path_test = os.path.join("/cluster/pixstor/xudong-lab/yuexu/D_PLM/ESM_1v_data/data_wedownloaded/41 mutation dataset/ESM-1v-41/test",row['Dataset_file']+".csv")
-        path_val = os.path.join("/cluster/pixstor/xudong-lab/yuexu/D_PLM/ESM_1v_data/data_wedownloaded/41 mutation dataset/ESM-1v-41/validation",row['Dataset_file']+".csv")
+        path_test = os.path.join(args.project_path,"ESM_1v_data/data_wedownloaded/41 mutation dataset/ESM-1v-41/test",row['Dataset_file']+".csv")
+        path_val = os.path.join(args.project_path,"ESM_1v_data/data_wedownloaded/41 mutation dataset/ESM-1v-41/validation",row['Dataset_file']+".csv")
         if os.path.exists(path_test):
            args.dms_input = path_test
         else:

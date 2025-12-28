@@ -13,14 +13,18 @@ module load miniconda3
 
 # Activate the Conda environment
 #source activate /home/wangdu/.conda/envs/pytorch1.13.0
-source activate /cluster/pixstor/xudong-lab/yuexu/env/splm_gvp_v1
+# source activate /cluster/pixstor/xudong-lab/yuexu/env/splm_gvp_v1
+source activate /cluster/pixstor/xudong-lab/yuexu/conda/envs/dplm_clone
 
 export TORCH_HOME=/cluster/pixstor/xudong-lab/yuexu/torch_cache/
 export HF_HOME=/cluster/pixstor/xudong-lab/yuexu/transformers_cache/
+export CONDA_PKGS_DIRS=/cluster/pixstor/xudong-lab/yuexu/conda/pkgs 
+export CONDA_ENVS_PATH=/cluster/pixstor/xudong-lab/yuexu/conda/envs 
+export PIP_CACHE_DIR=/cluster/pixstor/xudong-lab/yuexu/conda/pip_cache
 
 
 
 # accelerate launch train.py --config_path ./configs_hell/gvp_v2/config_plddtallweight_noseq_v2.yaml \
 # --result_path ./results/plddtallweight_noseq_v2/
-#accelerate launch train.py --config_path $config_path --result_path $result_path
-accelerate launch train_mdcath.py --config_path $config_path --result_path $result_path
+accelerate launch train.py --config_path $config_path --result_path $result_path
+#accelerate launch train_mdcath.py --config_path $config_path --result_path $result_path

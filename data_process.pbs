@@ -2,10 +2,10 @@
 #SBATCH --mem 100G
 #SBATCH -n 1
 ##SBATCH --gpus-per-node=1
-#SBATCH --gres gpu:A100:1
+##SBATCH --gres gpu:A100:1
 #SBATCH --time 02-00:00:00 #Time for the job to run
-##SBATCH -p general
-#SBATCH -p gpu
+#SBATCH -p general
+##SBATCH -p gpu
 ##SBATCH -p xudong-gpu
 ##SBATCH -p gpuH200x8
 ##SBATCH --account=bcnr-delta-gpu
@@ -16,14 +16,19 @@
 echo "### Starting at: $(date) ###"
 
 module load miniconda3
-source activate /cluster/pixstor/xudong-lab/yuexu/env/splm_gvp_v1
+# source activate /cluster/pixstor/xudong-lab/yuexu/env/splm_gvp_v1
+source activate /cluster/pixstor/xudong-lab/yuexu/conda/envs/dplm_clone
 export TORCH_HOME=/cluster/pixstor/xudong-lab/yuexu/torch_cache/
 export HF_HOME=/cluster/pixstor/xudong-lab/yuexu/transformers_cache/
+export CONDA_PKGS_DIRS=/cluster/pixstor/xudong-lab/yuexu/conda/pkgs 
+export CONDA_ENVS_PATH=/cluster/pixstor/xudong-lab/yuexu/conda/envs 
+export PIP_CACHE_DIR=/cluster/pixstor/xudong-lab/yuexu/conda/pip_cache
 
 
 #accelerate launch $command --config_path $config_filename --result_path $result_path
-python -m data.data_MD --data_folder2search $folder --list_num $num --output_folder $outfolder --split_num $split_num
+# python -m data.data_MD --data_folder2search $folder --list_num $num --output_folder $outfolder --split_num $split_num
 #python ./data/preprocess_traj.py --data_folder2search $folder --list_num $num --output_folder $outfolder --split_num $split_num
 # python -m data.preprocess_geom2vec --data_folder2search $folder --list_num $num --output_folder $outfolder --split_num $split_num
 # python -m data.preprocess_vivit --data_folder2search $folder --list_num $num --output_folder $outfolder --split_num $split_num
 # python ./data/preprocess_gvp.py --data $folder --save_path $outfolder
+python -m data.data_MD_v2 --data_folder2search $folder --list_num $num --output_folder $outfolder --split_num $split_num --frame_select_method $frame_method --frame_num $frame_num --frag_len $frag_len
