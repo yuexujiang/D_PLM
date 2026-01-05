@@ -1668,12 +1668,16 @@ class ESM2(nn.Module):  # embedding table is fixed
         self.num_layers = self.esm2.num_layers
         for p in self.esm2.parameters():  # frozen all parameters first
             p.requires_grad = False
-
+            
         if configs.model.esm_encoder.adapter_h.enable:
-            for name, param in self.esm2.named_parameters():
-                if "adapter_layer" in name:
-                    # print("unfix adapter_layer")
-                    param.requires_grad = True
+            if not isinstance(configs.model.esm_encoder.adapter_h.freeze_adapter_layers, list):
+                configs.model.esm_encoder.adapter_h.freeze_adapter_layers = [configs.model.esm_encoder.adapter_h.freeze_adapter_layers]
+            for adapter_idx, value in enumerate(configs.model.esm_encoder.adapter_h.freeze_adapter_layers):
+                if not value:
+                    for name, param in self.esm2.named_parameters():
+                        adapter_name = f"adapter_{adapter_idx}"
+                        if adapter_name in name:
+                            param.requires_grad = True
 
         if configs.model.esm_encoder.lora.enable:
             if accelerator.is_main_process:

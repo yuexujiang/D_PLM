@@ -14,6 +14,7 @@ from torch.utils.tensorboard import SummaryWriter
 from cosine_annealing_warmup import CosineAnnealingWarmupRestarts
 import ast
 from collections import OrderedDict
+from accelerate import Accelerator
 
 def prepare_tensorboard(result_path):
     train_path = os.path.join(result_path, 'train')
@@ -181,6 +182,107 @@ def load_configs(config, args=None):
     
     return tree_config
 
+def load_configs_infer(config, args=None):
+    """
+        Load the configuration file and convert the necessary values to floats.
+
+        Args:
+            config (dict): The configuration dictionary.
+
+        Returns:
+            The updated configuration dictionary with float values.
+        """
+
+    # Convert the dictionary to a Box object for easier access to the values.
+    tree_config = Box(config)
+
+    # Convert the necessary values to floats.
+    tree_config.optimizer.lr = float(tree_config.optimizer.lr)
+    tree_config.optimizer.decay.min_lr = float(tree_config.optimizer.decay.min_lr)
+    tree_config.optimizer.weight_decay = float(tree_config.optimizer.weight_decay)
+    tree_config.optimizer.eps = float(tree_config.optimizer.eps)
+    # overwrite parameters if set through commandline
+    #print("num_end_adapter_layers!!!!!!!!")
+    #print(tree_config.encoder.adapter_h.num_end_adapter_layers)
+    if args is not None:
+        if args.result_path:
+            tree_config.result_path = args.result_path
+
+        if args.resume_path:
+            tree_config.resume.resume_path = args.resume_path
+            #tree_config.resume.enable = True #if set by args, the resume enable will be overwrite as True
+        
+        if args.num_end_adapter_layers:
+            if not isinstance(args.num_end_adapter_layers, list):
+                if "-" in args.num_end_adapter_layers:
+                   args.num_end_adapter_layers = args.num_end_adapter_layers.split("-")
+                else:
+                   args.num_end_adapter_layers = [args.num_end_adapter_layers]
+            
+            args.num_end_adapter_layers = [int(x) for x in args.num_end_adapter_layers]
+            tree_config.encoder.adapter_h.num_end_adapter_layers = args.num_end_adapter_layers
+
+        if args.module_type:
+            tree_config.encoder.adapter_h.module_type = args.module_type
+
+    print("num_end_adapter_layers", tree_config.encoder.adapter_h.num_end_adapter_layers)
+
+    print("freeze_adapter_layers", tree_config.encoder.adapter_h.freeze_adapter_layers)
+
+    return tree_config
+
+def load_checkpoints_infer(configs, optimizer, scheduler, logging, net):
+    """
+    Load saved checkpoints from a previous training session.
+
+    Args:
+        configs: A python box object containing the configuration options.
+        optimizer (Optimizer): The optimizer to resume training with.
+        scheduler (Scheduler): The learning rate scheduler to resume training with.
+        logging (Logger): The logger to use for logging messages.
+        net (nn.Module): The neural network model to load the saved checkpoints into.
+
+    Returns:
+        tuple: A tuple containing the loaded neural network model and the epoch to start training from.
+    """
+    start_epoch = 1
+
+    # If the 'resume' flag is True, load the saved model checkpoints.
+    if configs.resume.enable:
+        model_checkpoint = torch.load(configs.resume.resume_path, map_location='cpu')
+        #net.load_state_dict(model_checkpoint['state_dict1'], strict=False)
+        if 'state_dict1' in model_checkpoint:
+            #to load old checkpoints that saved adapter_layer_dict as adapter_layer. 
+            from collections import OrderedDict
+            if np.sum(["adapter_layer_dict" in key for key in model_checkpoint['state_dict1'].keys()])==0: #using old checkpoints, need to rename the adapter_layer into adapter_layer_dict.adapter_0
+                 new_ordered_dict = OrderedDict()
+                 for key, value in model_checkpoint['state_dict1'].items():
+                     if "adapter_layer_dict" not in key:
+                       new_key = key.replace('adapter_layer', 'adapter_layer_dict.adapter_0')
+                       new_ordered_dict[new_key] = value
+                     else:
+                       new_ordered_dict[key] = value
+                 
+                 net.load_state_dict(new_ordered_dict,strict=False)
+            else: #new checkpoints with new code, that can be loaded directly.
+                  net.load_state_dict(model_checkpoint['state_dict1'], strict=False)
+        elif 'model_state_dict' in model_checkpoint:
+              net.load_state_dict(model_checkpoint['model_state_dict'], strict=False)
+        
+        logging.info(f'model checkpoint is loaded from: {configs.resume.resume_path}')
+        # If the saved checkpoint contains the optimizer and scheduler states and the epoch number,
+        # resume training from the last saved epoch.
+        if 'optimizer_state_dict' in model_checkpoint and 'scheduler_state_dict' in model_checkpoint and 'epoch' in model_checkpoint:
+            if not configs.resume.restart_optimizer:
+                optimizer.load_state_dict(model_checkpoint['optimizer_state_dict'])
+                logging.info('Optimizer is loaded to resume training!')
+
+                scheduler.load_state_dict(model_checkpoint['scheduler_state_dict'])
+                logging.info('Scheduler is loaded to resume training!')
+                start_epoch = model_checkpoint['epoch'] + 1
+
+    # Return the loaded model and the epoch to start training from.
+    return net, start_epoch
 
 def load_checkpoints(simclr, configs, optimizer_seq,optimizer_struct,scheduler_seq,scheduler_struct,
                      logging,resume_path,restart_optimizer=False):
@@ -427,6 +529,30 @@ def save_best_checkpoints(optimizer_x, optimizer_seq, result_path, simclr, n_ste
             return current_loss
         else:
             return best_loss
+        
+def save_checkpoint_infer(epoch: int, model_path: str, tools: dict, accelerator: Accelerator):
+    """
+    Save the model checkpoints during training.
+
+    Args:
+        epoch (int): The current epoch number.
+        model_path (str): The path to save the model checkpoint.
+        tools (dict): A dictionary containing the necessary tools for saving the model checkpoints.
+        accelerator (Accelerator): Accelerator object.
+
+    Returns:
+        None
+    """
+    # # Set the path to save the model checkpoint.
+    # model_path = os.path.join(tools['result_path'], 'checkpoints', f'checkpoint_{epoch}.pth')
+
+    # Save the model checkpoint.
+    torch.save({
+        'epoch': epoch,
+        'model_state_dict': accelerator.unwrap_model(tools['net'].state_dict()),
+        'optimizer_state_dict': accelerator.unwrap_model(tools['optimizer'].state_dict()),
+        'scheduler_state_dict': accelerator.unwrap_model(tools['scheduler'].state_dict()),
+    }, model_path)
 
 def save_struct_checkpoints(optimizer_struct, result_path, model, n_steps, logging, epoch,checkpoint_name=None):
     if checkpoint_name is None:
@@ -562,6 +688,62 @@ def prepare_optimizer(model_seq, model_x, logging, configs):
 
     return scheduler_seq, scheduler_x, optimizer_seq, optimizer_x
 
+def prepare_optimizer_infer(net, configs, num_train_samples, logging):
+    optimizer, scheduler = load_opt(net, configs, logging)
+    if scheduler is None:
+        if configs.optimizer.decay.first_cycle_steps:
+            first_cycle_steps = configs.optimizer.decay.first_cycle_steps
+        else:
+            whole_steps = np.ceil(
+                num_train_samples / configs.train_settings.grad_accumulation
+            ) * configs.train_settings.num_epochs
+            first_cycle_steps = np.ceil(whole_steps / configs.optimizer.decay.num_restarts)
+
+        scheduler = CosineAnnealingWarmupRestarts(
+            optimizer,
+            first_cycle_steps=first_cycle_steps,
+            cycle_mult=1.0,
+            max_lr=configs.optimizer.lr,
+            min_lr=configs.optimizer.decay.min_lr,
+            warmup_steps=configs.optimizer.decay.warmup,
+            gamma=configs.optimizer.decay.gamma)
+
+    return optimizer, scheduler
+
+def get_dummy_logging():
+    logger = log.getLogger(__name__)
+    logger.addHandler(log.NullHandler())
+    return logger
+
+def load_opt(model, config, logging):
+    scheduler = None
+    if config.optimizer.name.lower() == 'adabelief':
+        opt = optim.AdaBelief(model.parameters(), lr=config.optimizer.lr, eps=config.optimizer.eps,
+                              decoupled_decay=True,
+                              weight_decay=config.optimizer.weight_decay, rectify=False)
+    elif config.optimizer.name.lower() == 'adam':
+        # opt = eval('torch.optim.' + config.optimizer.name)(model.parameters(), lr=config.optimizer.lr, eps=eps,
+        #                                       weight_decay=config.optimizer.weight_decay)
+        if config.optimizer.use_8bit_adam:
+            import bitsandbytes
+            logging.info('use 8-bit adamw')
+            opt = bitsandbytes.optim.AdamW8bit(
+                model.parameters(), lr=float(config.optimizer.lr),
+                betas=(config.optimizer.beta_1, config.optimizer.beta_2),
+                weight_decay=float(config.optimizer.weight_decay),
+                eps=float(config.optimizer.eps),
+            )
+        else:
+            opt = torch.optim.AdamW(
+                model.parameters(), lr=float(config.optimizer.lr),
+                betas=(config.optimizer.beta_1, config.optimizer.beta_2),
+                weight_decay=float(config.optimizer.weight_decay),
+                eps=float(config.optimizer.eps)
+            )
+
+    else:
+        raise ValueError('wrong optimizer')
+    return opt, scheduler
 
 def plot_learning_rate(scheduler, optimizer, num_steps, filename):
     import matplotlib.pyplot as plt

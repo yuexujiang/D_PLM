@@ -632,9 +632,61 @@ result_path='./results/vivit_cluster_adp_sftsprloss/'
 sbatch --export=config_path=$config_path,result_path=$result_path, \
      -J ${task} \
      run_yjm85.sh
+
+task="mdadp_splmadp"
+config_path='./configs_hell/gvp_v2/config_mdadp_splmadp.yaml'
+result_path='./results/mdadp_splmadp/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
+
+task="vivit_splmadp"
+config_path='./configs_hell/gvp_v2/config_vivit_splmadp.yaml'
+result_path='./results/vivit_splmadp/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
+
+task="vivit_small"
+config_path='./configs_hell/gvp_v2/config_vivit3_2.yaml'
+result_path='./results/vivit3_small/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
 ###############################
 task="ddt"
 sbatch -J ${task} ./evaluate/ddt_train.pbs
+##############################
+task="ddt"
+config_path='./configs_hell/gvp_v2/ddt_config_adapterH_adapterH.yaml'
+result_path='./results/ddt_adapter2/'
+model_path='./results/vivit_cluster_adp/checkpoints/checkpoint_best_val_rmsf_cor.pth'
+sbatch --export=config_path=$config_path,result_path=$result_path,\
+model_path=$model_path -J ${task} train_ddt.pbs
+
+task="ddt_esm"
+config_path='./configs_hell/gvp_v2/ddt_config_esm2_adapterH.yaml'
+result_path='./results/ddt_esm_adapter/'
+model_path='./results/vivit_cluster_adp/checkpoints/checkpoint_best_val_rmsf_cor.pth'
+sbatch --export=config_path=$config_path,result_path=$result_path,\
+model_path=$model_path -J ${task} train_ddt.pbs
+
+task="ddt_random"
+config_path='./configs_hell/gvp_v2/ddt_config_random.yaml'
+result_path='./results/ddt_random/'
+model_path='./results/vivit_cluster_adp/checkpoints/checkpoint_best_val_rmsf_cor.pth'
+sbatch --export=config_path=$config_path,result_path=$result_path,\
+model_path=$model_path -J ${task} train_ddt.pbs
+
+accelerate launch train_ddt.py --config_path $config_path --result_path $result_path --resume_path $model_path
+
+
+task="idr"
+config_path='./configs_hell/gvp_v2/idr_config_adapterH_adapterH.yaml'
+result_path='./results/idr_adapter/'
+model_path='./results/vivit_cluster_adp/checkpoints/checkpoint_best_val_rmsf_cor.pth'
+sbatch --export=config_path=$config_path,result_path=$result_path,\
+model_path=$model_path -J ${task} train_idr.pbs
 #####################
 #need to submit in sbatch, need long time
 task="ESM1v_test"
