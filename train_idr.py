@@ -44,6 +44,7 @@ def train(accelerator, dataloader, tools, global_step):
     # f1_score = torchmetrics.F1Score(num_classes=tools['num_classes'], average='macro', task="multiclass")
     # accuracy.to(accelerator.device)
     # f1_score.to(accelerator.device)
+    tools['net'].train()
     tools["optimizer"].zero_grad()
     epoch_loss = 0
     train_loss = 0
@@ -95,32 +96,26 @@ def train(accelerator, dataloader, tools, global_step):
 
 def valid(accelerator, dataloader, tools):
     tools['net'].eval()
-
     # Initialize metrics
     # accuracy = torchmetrics.Accuracy(task="multiclass", num_classes=tools['num_classes'])
     # macro_f1_score = torchmetrics.F1Score(num_classes=tools['num_classes'], average='macro', task="multiclass")
     # f1_score = torchmetrics.F1Score(num_classes=tools['num_classes'], average=None, task="multiclass")
-
     # accuracy.to(accelerator.device)
     # macro_f1_score.to(accelerator.device)
     # f1_score.to(accelerator.device)
-
     counter = 0
     all_preds = []
     all_labels = []
     valid_loss = 0
-
     # progress_bar = tqdm(range(len(dataloader)),
     #                     disable=not accelerator.is_local_main_process, leave=False)
     # progress_bar.set_description("Steps")
-
     valid_loss = 0
     for i, data in enumerate(dataloader):
         # sequence, labels, sample_weight = data
         ids, seqs, labels = data
         labels_tensor = torch.nn.utils.rnn.pad_sequence(labels, batch_first=True, padding_value=-1).to(accelerator.device)
         mask = (labels_tensor != -1)
-
         with torch.inference_mode():
             logits = tools['net'](seqs)
             loss = tools['loss_function'](logits[mask], labels_tensor[mask].float())
@@ -129,16 +124,12 @@ def valid(accelerator, dataloader, tools):
             probs = torch.sigmoid(logits[mask])
             all_preds.append(accelerator.gather(probs))
             all_labels.append(accelerator.gather(labels_tensor[mask]))
-            
             valid_loss += loss.item()
             counter += 1
-
             # preds = torch.argmax(outputs, dim=1)
-
             # accuracy.update(accelerator.gather(preds).detach(), accelerator.gather(labels).detach())
             # macro_f1_score.update(accelerator.gather(preds).detach(), accelerator.gather(labels).detach())
             # f1_score.update(accelerator.gather(preds).detach(), accelerator.gather(labels).detach())
-
     metrics = compute_idr_metrics(all_preds, all_labels)
     return valid_loss / counter, metrics
 

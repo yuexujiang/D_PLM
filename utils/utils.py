@@ -631,9 +631,9 @@ def load_optimizers(model_seq, model_x, logging, configs):
             weight_decay=float(configs.optimizer.weight_decay),
             eps=float(configs.optimizer.eps)
           )
-        if model_x is not None and configs.model.X_module=="structure":
+        if model_x is not None:
           optimizer_x = torch.optim.AdamW(
-            model_x.parameters(), lr=float(configs.optimizer.lr_MD),
+            model_x.parameters(), lr=float(configs.optimizer.lr_x),
             betas=(configs.optimizer.beta_1, configs.optimizer.beta_2),
             weight_decay=float(configs.optimizer.weight_decay),
             eps=float(configs.optimizer.eps)

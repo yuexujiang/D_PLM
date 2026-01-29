@@ -7,6 +7,56 @@ import torch
 import yaml
 from utils.utils import load_configs
 import json
+import numpy as np
+
+from sklearn.model_selection import KFold
+
+
+def prepare_dataloaders_idr_kfold(configs, fold_idx: int, n_splits: int = 5, seed: int = 42):
+    """
+    Returns dataloaders for one fold:
+      - train: all folds except fold_idx
+      - valid: fold_idx
+      - test: fixed external test fasta
+    """
+    json_path = configs.train_settings.data_path
+    test_fasta_path = configs.test_settings.data_path
+
+    with open(json_path, 'r') as f:
+        train_data = json.load(f)
+
+    indices = np.arange(len(train_data))
+    kf = KFold(n_splits=n_splits, shuffle=True, random_state=seed)
+
+    folds = list(kf.split(indices))
+    train_idx, val_idx = folds[fold_idx]
+
+    train_set = IDRDataset([train_data[i] for i in train_idx])
+    val_set = IDRDataset([train_data[i] for i in val_idx])
+
+    test_data = parse_fasta_idr(test_fasta_path)
+    test_set = IDRDataset(test_data)
+
+    return {
+        'train': DataLoader(
+            train_set,
+            batch_size=configs.train_settings.batch_size,
+            shuffle=True,
+            collate_fn=collate_idr
+        ),
+        'valid': DataLoader(
+            val_set,
+            batch_size=configs.valid_settings.batch_size,
+            shuffle=False,
+            collate_fn=collate_idr
+        ),
+        'test': DataLoader(
+            test_set,
+            batch_size=configs.test_settings.batch_size,
+            shuffle=False,
+            collate_fn=collate_idr
+        ),
+    }
 
 class IDRDataset(Dataset):
     def __init__(self, data, max_len=1022):

@@ -571,8 +571,8 @@ def gyr(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='PyTorch SimCLR')
-    parser.add_argument("--model-location", type=str, help="xx", default='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_lora2/checkpoints/checkpoint_best_val_dms_corr.pth')
-    parser.add_argument("--config-path", type=str, default='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_lora2/config_lora2.yaml', help="xx")
+    parser.add_argument("--model-location", type=str, help="xx", default='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_cluster_adp/checkpoints/checkpoint_best_val_dms_corr.pth')
+    parser.add_argument("--config-path", type=str, default='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_cluster_adp/config_vivit_cluster_adp.yaml', help="xx")
     parser.add_argument("--model-type", default='d-plm', type=str, help="xx")
     parser.add_argument("--sequence", type=str, help="xx")
     parser.add_argument("--output_path", type=str, default='/cluster/pixstor/xudong-lab/yuexu/D_PLM/evaluate/', help="xx")

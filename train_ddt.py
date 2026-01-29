@@ -8,7 +8,7 @@ from time import time, sleep
 from tqdm import tqdm
 from utils.utils import load_configs_infer, test_gpu_cuda, prepare_tensorboard, prepare_optimizer_infer, save_checkpoint_infer, \
     get_logging, load_checkpoints_infer, prepare_saving_dir
-from data.data_ddt import prepare_dataloaders_fold
+from data.data_ddt import prepare_dataloaders_fold, prepare_dataloaders_from_dms
 from model_ddt import prepare_models
 from accelerate import Accelerator
 import torch.nn.functional as F
@@ -22,6 +22,7 @@ def train(epoch, accelerator, dataloader, tools, global_step, tensorboard_log, c
     # f1_score = torchmetrics.F1Score(num_classes=tools['num_classes'], average='macro', task="multiclass")
     # accuracy.to(accelerator.device)
     # f1_score.to(accelerator.device)
+    tools['net'].train()
     tools["optimizer"].zero_grad()
     epoch_loss = 0
     train_loss = 0
@@ -91,79 +92,60 @@ def train(epoch, accelerator, dataloader, tools, global_step, tensorboard_log, c
 
 def valid(epoch, accelerator, dataloader, tools, tensorboard_log):
     tools['net'].eval()
-
     # Initialize metrics
     # accuracy = torchmetrics.Accuracy(task="multiclass", num_classes=tools['num_classes'])
     # macro_f1_score = torchmetrics.F1Score(num_classes=tools['num_classes'], average='macro', task="multiclass")
     # f1_score = torchmetrics.F1Score(num_classes=tools['num_classes'], average=None, task="multiclass")
-
     # accuracy.to(accelerator.device)
     # macro_f1_score.to(accelerator.device)
     # f1_score.to(accelerator.device)
-
     counter = 0
     pred_list = []
     label_list = []
-
     progress_bar = tqdm(range(len(dataloader)),
                         disable=not accelerator.is_local_main_process, leave=False)
     progress_bar.set_description("Steps")
-
     valid_loss = 0
     for i, data in enumerate(dataloader):
         # sequence, labels, sample_weight = data
         wt, mut, ddg, prot_ids = data
-
         with torch.inference_mode():
             outputs = tools['net'](wt, mut)
-
             losses = tools['loss_function'](accelerator.gather(outputs), accelerator.gather(ddg))
             # pred_list.extend(outputs)
             # label_list.extend(ddg)
             pred_list.append(outputs.detach())
             label_list.append(ddg.detach())
-
             loss = torch.mean(losses)
-
             # preds = torch.argmax(outputs, dim=1)
-
             # accuracy.update(accelerator.gather(preds).detach(), accelerator.gather(labels).detach())
             # macro_f1_score.update(accelerator.gather(preds).detach(), accelerator.gather(labels).detach())
             # f1_score.update(accelerator.gather(preds).detach(), accelerator.gather(labels).detach())
-
         counter += 1
         valid_loss += loss.data.item()
-
         progress_bar.update(1)
         logs = {"step_loss": loss.detach().item(),
                 "lr": tools['optimizer'].param_groups[0]['lr']}
-
         progress_bar.set_postfix(**logs)
-
     valid_loss = valid_loss / counter
     # epoch_spearman_cor = spearmanr(pred_list, label_list)
     preds = torch.cat(pred_list, dim=0)
     labels = torch.cat(label_list, dim=0)
-    
     epoch_spearman_cor, _ = spearmanr(
         preds.cpu().numpy(),
         labels.cpu().numpy()
     )
-
     # epoch_acc = accuracy.compute().cpu().item()
     # epoch_macro_f1 = macro_f1_score.compute().cpu().item()
     # epoch_f1 = f1_score.compute().cpu()
-
     accelerator.log({"valid_cor": epoch_spearman_cor}, step=epoch)
     if tensorboard_log:
         tools['valid_writer'].add_scalar('cor', epoch_spearman_cor, epoch)
         # tools['valid_writer'].add_scalar('f1', epoch_macro_f1, epoch)
-
     # Reset metrics at the end of epoch
     # accuracy.reset()
     # macro_f1_score.reset()
     # f1_score.reset()
-
     return valid_loss, epoch_spearman_cor
 
 
@@ -199,6 +181,10 @@ def main(args, dict_config, config_file_path):
         dataloaders_dict["valid"],
         dataloaders_dict['test']
     )
+
+    
+
+
     # dataloaders_dict["test_fold"], dataloaders_dict["test_family"], dataloaders_dict[
     #     "test_super_family"] = accelerator.prepare(
     #     dataloaders_dict["test_fold"],
@@ -253,6 +239,70 @@ def main(args, dict_config, config_file_path):
     # best_valid_acc = 0
     # best_valid_f1 = {}
     # best_valid_macro_f1 = 0
+    # dataloaders_dict = prepare_dataloaders_from_dms(configs)
+    # dataloaders_dict["train"], dataloaders_dict["valid"] = accelerator.prepare(
+    #     dataloaders_dict["train"],
+    #     dataloaders_dict["valid"]
+    # )
+    # best_valid_mse = np.inf
+    # best_valid_spearman = 0
+    # global_step = 0
+    # for epoch in range(0, 2*configs.train_settings.num_epochs + 1):
+    #     tools['epoch'] = epoch
+    #     start_time = time()
+    #     train_loss, train_cor = train(epoch, accelerator, dataloaders_dict["train"],
+    #                                             tools, global_step,
+    #                                             configs.tensorboard_log, configs)
+    #     end_time = time()
+    #     if accelerator.is_main_process:
+    #         logging.info(f'epoch {epoch} - time {np.round(end_time - start_time, 2)}s, '
+    #                      f'train loss {np.round(train_loss, 4)}, train cor {np.round(train_cor, 4)}')
+
+    #     if epoch % configs.valid_settings.do_every == 0 and epoch != 0:
+    #         start_time = time()
+    #         valid_loss, valid_cor = valid(epoch, accelerator,
+    #                                       dataloaders_dict["valid"],
+    #                                       tools,
+    #                                       tensorboard_log=False)
+    #         end_time = time()
+    #         if accelerator.is_main_process:
+    #             logging.info(
+    #                 f'evaluation - time {np.round(end_time - start_time, 2)}s, '
+    #                 f'valid loss {np.round(valid_loss, 6)}, valid cor {np.round(valid_cor, 6)}')
+
+    #         if valid_loss< best_valid_mse:
+    #             best_valid_mse = valid_loss
+    #             model_path = os.path.join(tools['result_path'], 'checkpoints', f'best_dms_model_mse.pth')
+    #             accelerator.wait_for_everyone()
+    #             save_checkpoint_infer(epoch, model_path, tools, accelerator)
+    #         if valid_cor > best_valid_spearman:
+    #             best_valid_spearman = valid_cor
+    #             model_path = os.path.join(tools['result_path'], 'checkpoints', f'best_dms_model_cor.pth')
+    #             save_checkpoint_infer(epoch, model_path, tools, accelerator)
+            
+
+    #     # if epoch % configs.checkpoints_every == 0:
+    #     #     # Set the path to save the model checkpoint.
+    #     #     model_path = os.path.join(tools['result_path'], 'checkpoints', f'checkpoint_{epoch}.pth')
+    #     #     accelerator.wait_for_everyone()
+    #     #     save_checkpoint(epoch, model_path, tools, accelerator)
+
+    # if accelerator.is_main_process:
+    #     logging.info(f'best valid mse: {np.round(best_valid_mse, 6)}')
+    #     logging.info(f'best valid cor: {np.round(best_valid_spearman, 6)}')
+
+    # sleep(20)
+
+    # model_path = os.path.join(tools['result_path'], 'checkpoints', 'best_dms_model_mse.pth')
+    # model_checkpoint = torch.load(model_path, map_location='cpu')
+    # net.load_state_dict(model_checkpoint['model_state_dict'])
+
+    # dataloaders_dict = prepare_dataloaders_fold(configs)
+    # dataloaders_dict["train"], dataloaders_dict["valid"], dataloaders_dict['test'] = accelerator.prepare(
+    #     dataloaders_dict["train"],
+    #     dataloaders_dict["valid"],
+    #     dataloaders_dict['test']
+    # )
     best_valid_mse = np.inf
     best_valid_spearman = 0
     global_step = 0

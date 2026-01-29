@@ -1,0 +1,142 @@
+fix_seed: 0
+checkpoints_every: 5000
+tensorboard_log: True
+result_path: ./results/test
+# HF_cache_path: ./HF_cashe_path
+
+resume:
+  resume: False
+  resume_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/results/test2/checkpoints/checkpoint_0030000.pth
+  restart_optimizer: True
+
+model:
+  residue_out_dim: 64
+  protein_out_dim: 1024
+  residue_num_projector: 1
+  protein_num_projector: 2
+  X_module: MD_tune #structure
+
+  MD_encoder:
+    model_name: google/vivit-b-16x2-kinetics400
+    residue_inner_dim: 1024
+    protein_inner_dim: 2048
+    dim_mlp: 768
+    fine_tuning:
+      enable: False
+      unfix_last_layer: 2
+    adapter_h:
+      enable: True
+      num_end_adapter_layers: 2
+    fine_tuning_projct:
+         enable: True
+  esm_encoder:
+    model_name:  esm2_t33_650M_UR50D # esm2_t33_650M_UR50D, esm2_t30_150M_UR50D, esm2_t12_35M_UR50D, esm2_t6_8M_UR50D
+    max_length: 512
+    residue_inner_dim: 1024
+    protein_inner_dim: 2048
+    fine_tuning:
+      enable: False
+      unfix_last_layer: 2
+    adapter_h:
+      enable: True
+      num_end_adapter_layers: 4
+      module_type: "MLP1"
+      freeze_adapter_layers: False
+    lora:
+      enable: False
+      r: 8
+      alpha: 32
+      dropout: 0.05
+      resume:
+        enable: False
+        checkpoint_path: path/to/checkpoints.pth
+    MLM:
+      enable: False
+      mask_ratio: 0.15
+      mode: "predict"
+  struct_encoder:
+    version: v2 #v1 or v2
+    residue_inner_dim: 1024
+    protein_inner_dim: 4096
+    fine_tuning:
+         enable: True
+    
+    use_rotary_embeddings: True
+    rotary_mode: 2 #1: d1-d2 2: edge_index 3:edge_index+E_vectors
+    use_foldseek: False
+    use_foldseek_vector: True
+    gvp_num_layers: 3
+    top_k: 30 #default 30 The number of edges to draw per node (as destination node).
+    num_rbf: 16   #default 16
+    num_positional_embeddings: 16  #default 16
+    node_h_dim: (100,32) #default (100,32)
+    edge_h_dim: (32,1)   #default (32,1)
+    use_seq:
+       enable: False
+       seq_embed_mode: "Atchleyfactor" #"embedding":20,"ESM2":1280,Atchleyfactor:5 PhysicsPCA:5
+       seq_embed_dim: 5 #1280 for ESM2
+    lora:
+      enable: False
+      r: 8
+      alpha: 32
+      dropout: 0.05
+      resume:
+        enable: False
+        checkpoint_path: path/to/checkpoints.pth
+
+train_settings:
+  MD_data_path: ./data/MD/dev_data/
+  #data_path: /cluster/pixstor/xudong-lab/duolin/swiss-pos-512-v2_splitdata/train/
+  Atlas_data_repli_0_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_cluster32_atlas_data_rep0
+  Atlas_data_repli_1_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_cluster32_atlas_data_rep1
+  Atlas_data_repli_2_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_cluster32_atlas_data_rep2
+  Atlas_test_repli_0_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_cluster32_atlas_test_rep0
+  Atlas_test_repli_1_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_cluster32_atlas_test_rep1
+  Atlas_test_repli_2_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_cluster32_atlas_test_rep2
+  num_steps: 6000 #10000000
+  shuffle: True
+  mixed_precision: "fp16" # no, fp16, bf16, fp8
+  batch_size: 32
+  residue_batch_size: 2000
+  num_workers: 1
+  gradient_accumulation: 1
+  n_views: 2
+  temperature: 0.1
+  plddt_weight: True
+  plddt_weight_mode: "all" #"positive" "all"
+
+
+valid_settings:
+  data_path: /cluster/pixstor/xudong-lab/duolin/swiss-pos-512-v2_splitdata/val/
+  cath_path: /cluster/pixstor/xudong-lab/duolin/CATH/seq_subfamily/Rep_subfamily_basedon_S40pdb.fa
+  deaminase_path: /cluster/pixstor/xudong-lab/duolin/simCLR/Deaminases_clustering/Table_S1.xlsx
+  kinase_path: /cluster/pixstor/xudong-lab/duolin/simCLR/kinase_clustering/GPS5.0_homo_hasPK_with_kinasedomain.txt
+  dms_summary_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/ESM_1v_data/results/ESM-1v_data_summary_start_end_seq_splm_esm2.csv
+  dms_path: "/cluster/pixstor/xudong-lab/yuexu/D_PLM/ESM_1v_data/data_wedownloaded/41 mutation dataset/ESM-1v-41/"
+  analysis_path: /cluster/pixstor/xudong-lab/yuexu/D_PLM/analysis/
+  do_every: 50 # steps
+  num_workers: 1
+  batch_size: 1
+  eval_struct: 
+      enable: False
+      do_every: 1000
+      cath_pdb_path: /cluster/pixstor/xudong-lab/duolin/CATH/CATH_4_3_0_non-rep_gvp/
+
+optimizer:
+  name: adam
+  lr_seq: 0.001
+  lr_x: 0.0001
+  weight_decouple: True
+  weight_decay: 0.0005
+  eps: 1e-16
+  beta_1: 0.9
+  beta_2: 0.999
+  grad_clip_norm: 1
+  decay:
+    warmup: 50
+    min_lr_seq: 0
+    min_lr_struct: 0
+    min_lr_MD: 0
+    min_lr_x: 0
+    gamma: 1
+    first_cycle_steps: 200 #2000

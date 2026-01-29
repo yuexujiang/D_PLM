@@ -4,8 +4,8 @@
 #SBATCH --gres gpu:A100:1
 #SBATCH --time 01-00:00:00 #Time for the job to run
 #SBATCH --job-name long
-##SBATCH -p gpu
-#SBATCH -p xudong-gpu
+#SBATCH -p gpu
+##SBATCH -p xudong-gpu
 #SBATCH -A xudong-lab
 
 

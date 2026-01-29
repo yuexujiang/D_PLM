@@ -653,13 +653,62 @@ result_path='./results/vivit3_small/'
 sbatch --export=config_path=$config_path,result_path=$result_path, \
      -J ${task} \
      run_yjm85.sh
+
+task="vivit_cluster_adp3"
+config_path='./configs_hell/gvp_v2/config_vivit_cluster_adp3.yaml'
+result_path='./results/vivit_cluster_adp3/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
+
+task="vivit_3_3"
+config_path='./configs_hell/gvp_v2/config_vivit3_3.yaml'
+result_path='./results/vivit3_3/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
+
+task="vivit_3_3adam_small"
+config_path='./configs_hell/gvp_v2/config_vivit3_3adam_small.yaml'
+result_path='./results/vivit3_3adam_small/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
+
+task="vivit_cluster_adam"
+config_path='./configs_hell/gvp_v2/config_vivit_cluster_adp4_adam.yaml'
+result_path='./results/vivit_cluster_adp4_adam/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
+
+task="vivit_cluster_adam5"
+config_path='./configs_hell/gvp_v2/config_vivit_cluster_adp5_adam.yaml'
+result_path='./results/vivit_cluster_adp5_adam/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
+
+task="vivit3_adam4"
+config_path='./configs_hell/gvp_v2/config_vivit3_4adam.yaml'
+result_path='./results/vivit3_4adam/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
+
+task="vivit_cluster_adam6"
+config_path='./configs_hell/gvp_v2/config_vivit_cluster_adp6_adam.yaml'
+result_path='./results/vivit_cluster_adp6_adam/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
 ###############################
 task="ddt"
 sbatch -J ${task} ./evaluate/ddt_train.pbs
 ##############################
 task="ddt"
 config_path='./configs_hell/gvp_v2/ddt_config_adapterH_adapterH.yaml'
-result_path='./results/ddt_adapter2/'
+result_path='./results/ddt_adapter2_fix/'
 model_path='./results/vivit_cluster_adp/checkpoints/checkpoint_best_val_rmsf_cor.pth'
 sbatch --export=config_path=$config_path,result_path=$result_path,\
 model_path=$model_path -J ${task} train_ddt.pbs
@@ -678,15 +727,113 @@ model_path='./results/vivit_cluster_adp/checkpoints/checkpoint_best_val_rmsf_cor
 sbatch --export=config_path=$config_path,result_path=$result_path,\
 model_path=$model_path -J ${task} train_ddt.pbs
 
+task="ddt_vivit3_small"
+config_path='./configs_hell/gvp_v2/ddt_config_adapterH4_adapterH.yaml'
+result_path='./results/ddt_vivit3_small/'
+model_path='./results/vivit3_small/checkpoints/checkpoint_best_val_rmsf_cor.pth'
+sbatch --export=config_path=$config_path,result_path=$result_path,\
+model_path=$model_path -J ${task} train_ddt.pbs
+
+task="ddt_vivit3"
+config_path='./configs_hell/gvp_v2/ddt_config_adapterH16_adapterH4.yaml'
+result_path='./results/ddt_vivit3_dms/'
+model_path='./results/vivit_3/checkpoints/checkpoint_best_val_rmsf_cor.pth'
+sbatch --export=config_path=$config_path,result_path=$result_path,\
+model_path=$model_path -J ${task} train_ddt.pbs
+
+task="ddt_vivit3_dms"
+config_path='./configs_hell/gvp_v2/ddt_config_adapterH16_adapterH4.yaml'
+result_path='./results/ddt_vivit3_dms2/'
+model_path='./results/vivit_3/checkpoints/checkpoint_best_val_rmsf_cor.pth'
+sbatch --export=config_path=$config_path,result_path=$result_path,\
+model_path=$model_path -J ${task} train_ddt_dms.pbs
+
+task="ddt_vivit3"
+config_path='./configs_hell/gvp_v2/ddt_config_adapterH16_adapterH4.yaml'
+result_path='./results/ddt_vivit3_fixtrain/'
+model_path='./results/vivit_3/checkpoints/checkpoint_best_val_rmsf_cor.pth'
+sbatch --export=config_path=$config_path,result_path=$result_path,\
+model_path=$model_path -J ${task} train_ddt.pbs
+
 accelerate launch train_ddt.py --config_path $config_path --result_path $result_path --resume_path $model_path
 
 
 task="idr"
 config_path='./configs_hell/gvp_v2/idr_config_adapterH_adapterH.yaml'
-result_path='./results/idr_adapter/'
+result_path='./results/idr_adapter_fix/'
 model_path='./results/vivit_cluster_adp/checkpoints/checkpoint_best_val_rmsf_cor.pth'
 sbatch --export=config_path=$config_path,result_path=$result_path,\
 model_path=$model_path -J ${task} train_idr.pbs
+
+task="idr_vivit3"
+config_path='./configs_hell/gvp_v2/idr_config_adapterH4_adapterH.yaml'
+result_path='./results/idr_vivit3_small/'
+model_path='./results/vivit3_small/checkpoints/checkpoint_best_val_rmsf_cor.pth'
+sbatch --export=config_path=$config_path,result_path=$result_path,\
+model_path=$model_path -J ${task} train_idr.pbs
+
+task="idr_vivit3_80"
+config_path='./configs_hell/gvp_v2/idr_config_adapterH4_adapterH_80.yaml'
+result_path='./results/idr_vivit3_small_80/'
+model_path='./results/vivit3_small/checkpoints/checkpoint_best_val_rmsf_cor.pth'
+sbatch --export=config_path=$config_path,result_path=$result_path,\
+model_path=$model_path -J ${task} train_idr.pbs
+
+task="idr_esm"
+config_path='./configs_hell/gvp_v2/idr_config_esm2_adapterH.yaml'
+result_path='./results/idr_esm/'
+model_path='./results/vivit3_small/checkpoints/checkpoint_best_val_rmsf_cor.pth'
+sbatch --export=config_path=$config_path,result_path=$result_path,\
+model_path=$model_path -J ${task} train_idr.pbs
+
+task="idr_cls_adam"
+config_path='./configs_hell/gvp_v2/idr_config_adapterH4_adapterH2.yaml'
+result_path='./results/idr_cls_adam/'
+model_path='./results/vivit_cluster_adp4_adam/checkpoints/checkpoint_best_val_rmsf_cor.pth'
+sbatch --export=config_path=$config_path,result_path=$result_path,\
+model_path=$model_path -J ${task} train_idr.pbs
+
+task="idr_md_adam"
+config_path='./configs_hell/gvp_v2/idr_config_adapterH2_adapterH2.yaml'
+result_path='./results/idr_md_adam/'
+model_path='./results/vivit3_3adam_small/checkpoints/checkpoint_best_val_rmsf_cor.pth'
+sbatch --export=config_path=$config_path,result_path=$result_path,\
+model_path=$model_path -J ${task} train_idr.pbs
+
+task="idr_vivit3"
+config_path='./configs_hell/gvp_v2/idr_config_adapterH16_adapterH4.yaml'
+result_path='./results/idr_vivit3_caid2/'
+model_path='./results/vivit_3/checkpoints/checkpoint_best_val_rmsf_cor.pth'
+sbatch --export=config_path=$config_path,result_path=$result_path,\
+model_path=$model_path -J ${task} train_idr.pbs
+
+task="idr_kfold"
+config_path='./configs_hell/gvp_v2/idr_config_adapterH16_adapterH4.yaml'
+result_path='./results/idr_kfold_vivit3/'
+model_path='./results/vivit_3/checkpoints/checkpoint_best_val_rmsf_cor.pth'
+sbatch --export=config_path=$config_path,result_path=$result_path,\
+model_path=$model_path -J ${task} train_idr_kfold.pbs
+
+task="idr_30caid2"
+config_path='./configs_hell/gvp_v2/idr_config_30CAID2_trainfix_adp16_adp4.yaml'
+result_path='./results/idr_vivit3_trainfix_30caid2/'
+model_path='./results/vivit_3/checkpoints/checkpoint_best_val_rmsf_cor.pth'
+sbatch --export=config_path=$config_path,result_path=$result_path,\
+model_path=$model_path -J ${task} train_idr.pbs
+
+task="idr_100caid2"
+config_path='./configs_hell/gvp_v2/idr_config_100CAID2_trainfix_adp16_adp4.yaml'
+result_path='./results/idr_vivit3_trainfix_100caid2/'
+model_path='./results/vivit_3/checkpoints/checkpoint_best_val_rmsf_cor.pth'
+sbatch --export=config_path=$config_path,result_path=$result_path,\
+model_path=$model_path -J ${task} train_idr.pbs
+
+task="idr_kfold"
+config_path='./configs_hell/gvp_v2/idr_config_30CAID2_trainfix_adp16_adp4.yaml'
+result_path='./results/idr_kfold_trainfix/'
+model_path='./results/vivit_3/checkpoints/checkpoint_best_val_rmsf_cor.pth'
+sbatch --export=config_path=$config_path,result_path=$result_path,\
+model_path=$model_path -J ${task} train_idr_kfold.pbs
 #####################
 #need to submit in sbatch, need long time
 task="ESM1v_test"
@@ -942,6 +1089,38 @@ sbatch --export=model_location=$model_location,config_path=$config_path,scoring_
 task="vivit_CHANGE_tune"
 model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_change_tune/checkpoints/checkpoint_best_val_rmsf_cor.pth'
 config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_change_tune/config_vivit_change_mlm.yaml'
+scoring_strategy='wt-mt-RLA' #"mask-marginals" "wt-mt-RLA"
+sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
+       -J ${task} \
+       ./evaluate/mutation_effect_ESM1v.pbs
+
+task="vivit3_small"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit3_small/checkpoints/checkpoint_best_val_rmsf_cor.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit3_small/config_vivit3_2.yaml'
+scoring_strategy='wt-mt-RLA' #"mask-marginals" "wt-mt-RLA"
+sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
+       -J ${task} \
+       ./evaluate/mutation_effect_ESM1v.pbs
+
+task="vivit_cluster_adam"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_cluster_adp4_adam/checkpoints/checkpoint_best_val_rmsf_cor.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_cluster_adp4_adam/config_vivit_cluster_adp4_adam.yaml'
+scoring_strategy='wt-mt-RLA' #"mask-marginals" "wt-mt-RLA"
+sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
+       -J ${task} \
+       ./evaluate/mutation_effect_ESM1v.pbs
+
+task="vivit3_adam"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit3_3adam_small/checkpoints/checkpoint_best_val_rmsf_cor.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit3_3adam_small/config_vivit3_3adam_small.yaml'
+scoring_strategy='wt-mt-RLA' #"mask-marginals" "wt-mt-RLA"
+sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
+       -J ${task} \
+       ./evaluate/mutation_effect_ESM1v.pbs
+
+task="vivit_cluster"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_cluster_adp6_adam/checkpoints/checkpoint_best_val_rmsf_cor.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_cluster_adp6_adam/config_vivit_cluster_adp6_adam.yaml'
 scoring_strategy='wt-mt-RLA' #"mask-marginals" "wt-mt-RLA"
 sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
        -J ${task} \
