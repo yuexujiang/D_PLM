@@ -117,7 +117,7 @@ def load_checkpoints(model,checkpoint_path):
 #     return model,alphabet
 
 def load_model(args):
-    if args.model_type=="s-plm":
+    if args.model_type=="d-plm":
         with open(args.config_path) as file:
             config_file = yaml.full_load(file)
             configs = load_configs(config_file, args=None)
@@ -240,10 +240,11 @@ def gogogo(args):
     datapath = '/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_test/'
     # datapath_MDfeature = '/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_test_R1/'
     processed_list=[]
-    rep_norm_list=[]
-    rmsf_list=[]
-    rep_dis_list=[]
-    dccm_list=[]
+    # rep_norm_list=[]
+    # rmsf_list=[]
+    # rep_dis_list=[]
+    # dccm_list=[]
+    corr_list=[]
     for file_name in os.listdir(datapath):
         print(f"processing...{file_name}")
         pid="_".join(file_name.split('_')[:2])
@@ -261,8 +262,10 @@ def gogogo(args):
         rmsf_file = os.path.join("/cluster/pixstor/xudong-lab/yuexu/D_PLM/analysis/", f"{pid}_analysis", f"{pid}_RMSF.tsv")
         df = pd.read_csv(rmsf_file, sep="\t")
         r1 = df["RMSF_R1"].values
-        rep_norm_list.extend(residue_norms)
-        rmsf_list.extend(r1)
+        # rep_norm_list.extend(residue_norms)
+        # rmsf_list.extend(r1)
+        corr, _ = spearmanr(residue_norms, r1)
+        corr_list.append(corr)
         # r2 = df["RMSF_R2"].values
         # rep_norm_list.extend(residue_norms)
         # rmsf_list.extend(r2)
@@ -298,7 +301,190 @@ def gogogo(args):
         # corr_rmsf, _ = spearmanr(residue_norms, rmsf)
         processed_list.append(pid)
     #
-    return (rep_norm_list, rmsf_list), (rep_dis_list, dccm_list)
+    # return (rep_norm_list, rmsf_list), (rep_dis_list, dccm_list)
+    return corr_list
+
+from transformers import AutoTokenizer
+import sys
+from Bio.PDB import PDBParser, PPBuilder
+sys.path.insert(0, "/work/nvme/bcnr/jyx/dplm/SeqDance-main/SeqDance-main/model/")
+from model import ESMwrap
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+tokenizer = AutoTokenizer.from_pretrained("facebook/esm2_t12_35M_UR50D")
+esm2_select = 'model_35M'
+model_select = 'seqdance' # 'seqdance' or 'esmdance'
+dance_model = ESMwrap(esm2_select, model_select)
+# Load the SeqDance model from huggingface
+dance_model = dance_model.from_pretrained("ChaoHou/ESMDance")
+dance_model = dance_model.to(device)
+dance_model.eval()
+
+def gogogo_seqdance():
+    #
+    #
+    datapath = '/work/nvme/bcnr/jyx/dplm/Atlas_geom2vec_test/'
+    # datapath_MDfeature = '/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_test_R1/'
+    processed_list=[]
+    # rep_norm_list=[]
+    # rmsf_list=[]
+    # rep_dis_list=[]
+    # dccm_list=[]
+    corr_list=[]
+    sig_list=[]
+    for file_name in os.listdir(datapath):
+        print(f"processing...{file_name}")
+        pid="_".join(file_name.split('_')[:2])
+        if pid in processed_list:
+            continue
+        pdb_file = os.path.join("/work/nvme/bcnr/jyx/dplm/analysis/", f"{pid}_analysis", f"{pid}.pdb")
+        sequence = str(pdb2seq(pdb_file))
+        #
+        # seq_emb = main(args) #[seq_l+2, 1280]
+        raw_input = tokenizer([sequence], return_tensors="pt")
+        raw_input = raw_input.to(device)
+        with torch.no_grad():
+            seq_emb = dance_model(raw_input, return_res_emb=True, return_attention_map=False, return_res_pred=False, return_pair_pred=False)
+        seq_emb = seq_emb['res_emb'][:,1:-1,:].squeeze(0)
+        # print(seq_emb.shape)
+        distance_matrix = pairwise_distances(seq_emb.cpu(), metric="euclidean")  # or cosine
+        residue_norms = np.linalg.norm(seq_emb.cpu(), axis=1)
+        #
+        rmsf_file = os.path.join("/work/nvme/bcnr/jyx/dplm/analysis/", f"{pid}_analysis", f"{pid}_RMSF.tsv")
+        df = pd.read_csv(rmsf_file, sep="\t")
+        r1 = df["RMSF_R1"].values
+        # rep_norm_list.extend(residue_norms)
+        # rmsf_list.extend(r1)
+        # corr_cca = compute_cca_correlation(seq_emb.cpu().numpy(), r1)
+        # from sklearn.decomposition import PCA
+        # pca = PCA(n_components=1)
+        # emb_proj = pca.fit_transform(seq_emb.cpu().numpy()).flatten()
+        # corr_pca, p_pca = spearmanr(emb_proj, r1)
+        corr, _ = spearmanr(residue_norms, r1)
+        corr_list.append(corr)
+        # sig_list.append(p_pca)
+        # r2 = df["RMSF_R2"].values
+        # rep_norm_list.extend(residue_norms)
+        # rmsf_list.extend(r2)
+        # r3 = df["RMSF_R3"].values
+        # rep_norm_list.extend(residue_norms)
+        # rmsf_list.extend(r3)
+        # print(r1.shape)
+        # MDfeature_file_r1 = os.path.join(datapath_MDfeature, f"{file_name[:-3]}.h5")
+        # if os.path.exists(MDfeature_file_r1):
+        #     rmsf, dccm, mi, seq, pid = load_h5_file_v2(MDfeature_file_r1)
+        #     r1 = flatten_upper(distance_matrix)
+        #     r2 = flatten_upper(1 - np.abs(dccm))  # higher = more correlated motion
+        #     rep_dis_list.extend(r1)
+        #     dccm_list.extend(r2)
+        #
+        # MDfeature_file_r2 = os.path.join(datapath_MDfeature, f"{file_name}_prod_R2_fit.h5")
+        # if os.path.exists(MDfeature_file_r2):
+        #     rmsf, dccm, mi, seq, pid = load_h5_file_v2(MDfeature_file_r2)
+        #     r1 = flatten_upper(distance_matrix)
+        #     r2 = flatten_upper(1 - np.abs(dccm))  # higher = more correlated motion
+        #     rep_dis_list.extend(r1)
+        #     dccm_list.extend(r2)
+        
+        # MDfeature_file_r3 = os.path.join(datapath_MDfeature, f"{file_name}_prod_R3_fit.h5")
+        # if os.path.exists(MDfeature_file_r3):
+        #     rmsf, dccm, mi, seq, pid = load_h5_file_v2(MDfeature_file_r3)
+        #     r1 = flatten_upper(distance_matrix)
+        #     r2 = flatten_upper(1 - np.abs(dccm))  # higher = more correlated motion
+        #     rep_dis_list.extend(r1)
+        #     dccm_list.extend(r2)
+        #
+        # corr, _ = spearmanr(r1, r2)
+        # corr_rmsf, _ = spearmanr(residue_norms, rmsf)
+        processed_list.append(pid)
+    #
+    return corr_list
+	
+	
+from transformers import T5Tokenizer, T5EncoderModel
+import torch
+import re
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
+# Load the tokenizer
+tokenizer = T5Tokenizer.from_pretrained('Rostlab/ProstT5', do_lower_case=False)
+
+# Load the model
+model = T5EncoderModel.from_pretrained("Rostlab/ProstT5").to(device)
+datapath = '/work/nvme/bcnr/jyx/dplm/Atlas_geom2vec_test/'
+# datapath_MDfeature = '/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_test_R1/'
+processed_list=[]
+corr_list=[]
+
+for file_name in os.listdir(datapath):
+    print(f"processing...{file_name}")
+    pid="_".join(file_name.split('_')[:2])
+    if pid in processed_list:
+        continue
+    pdb_file = os.path.join("/work/nvme/bcnr/jyx/dplm/analysis/", f"{pid}_analysis", f"{pid}.pdb")
+    sequences = [str(pdb2seq(pdb_file))]
+    sequence_examples = [" ".join(list(re.sub(r"[UZOB]", "X", sequence))) for sequence in sequences]
+    # The direction of the translation is indicated by two special tokens:
+    # if you go from AAs to 3Di (or if you want to embed AAs), you need to prepend "<AA2fold>"
+    # if you go from 3Di to AAs (or if you want to embed 3Di), you need to prepend "<fold2AA>"
+    sequence_examples = [ "<AA2fold>" + " " + s if s.isupper() else "<fold2AA>" + " " + s # this expects 3Di sequences to be already lower-case
+                          for s in sequence_examples
+                        ]
+    
+    # tokenize sequences and pad up to the longest sequence in the batch
+    ids = tokenizer.batch_encode_plus(sequence_examples,
+                                      add_special_tokens=True,
+                                      padding="longest",
+                                      return_tensors='pt').to(device)
+    
+    # generate embeddings
+    with torch.no_grad():
+        embedding_repr = model(
+                  ids.input_ids, 
+                  attention_mask=ids.attention_mask
+                  )
+        
+    seq_emb = embedding_repr.last_hidden_state[0, 1:-1,:]
+    distance_matrix = pairwise_distances(seq_emb.cpu(), metric="euclidean")  # or cosine
+    residue_norms = np.linalg.norm(seq_emb.cpu(), axis=1)
+    #
+    rmsf_file = os.path.join("/work/nvme/bcnr/jyx/dplm/analysis/", f"{pid}_analysis", f"{pid}_RMSF.tsv")
+    df = pd.read_csv(rmsf_file, sep="\t")
+    r1 = df["RMSF_R1"].values
+    #rep_norm_list.extend(residue_norms)
+    #rmsf_list.extend(r1)
+    corr, _ = spearmanr(residue_norms, r1)
+    corr_list.append(corr)
+    processed_list.append(pid)
+	
+	
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Example data (replace with your real lists)
+method1 = [1.2, 1.5, 1.7, 2.0, 1.9]
+method2 = [0.8, 1.0, 1.1, 1.3, 1.2]
+method3 = [2.2, 2.4, 2.1, 2.8, 2.5]
+method4 = [1.0, 0.9, 1.4, 1.3, 1.1]
+
+data = [method1, method2, method3, method4]
+labels = ["Method1", "Method2", "Method3", "Method4"]
+
+plt.figure(figsize=(8, 5))
+
+# Boxplot
+plt.boxplot(data, labels=labels, showmeans=True)
+
+# Overlay scatter points with jitter
+for i, values in enumerate(data, start=1):
+    x = np.random.normal(i, 0.04, size=len(values))  # jitter
+    plt.scatter(x, values, alpha=0.7, s=30)
+
+plt.ylabel("Value")
+plt.title("Distribution Comparison with Individual Data Points")
+plt.grid(axis="y", linestyle="--", alpha=0.6)
+
+plt.show()
 
 def B_factor(args):
     #
@@ -571,8 +757,8 @@ def gyr(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='PyTorch SimCLR')
-    parser.add_argument("--model-location", type=str, help="xx", default='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_cluster_adp/checkpoints/checkpoint_best_val_dms_corr.pth')
-    parser.add_argument("--config-path", type=str, default='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_cluster_adp/config_vivit_cluster_adp.yaml', help="xx")
+    parser.add_argument("--model-location", type=str, help="xx", default='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_3/checkpoints/checkpoint_best_val_rmsf_cor.pth')
+    parser.add_argument("--config-path", type=str, default='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_3/config_vivit3.yaml', help="xx")
     parser.add_argument("--model-type", default='d-plm', type=str, help="xx")
     parser.add_argument("--sequence", type=str, help="xx")
     parser.add_argument("--output_path", type=str, default='/cluster/pixstor/xudong-lab/yuexu/D_PLM/evaluate/', help="xx")

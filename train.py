@@ -6,7 +6,7 @@ import numpy as np
 from tqdm import tqdm
 from accelerate import Accelerator, DistributedDataParallelKwargs
 import torch
-from model import prepare_models, AverageMeter, info_nce_loss, info_nce_weights
+from model import prepare_models, AverageMeter, info_nce_loss, info_nce_weights, clip_infonce
 from model import log_negative_mean_logtis
 from model import MaskedLMDataCollator
 
@@ -576,8 +576,11 @@ def prepare_loss_MD(simclr,traj,batch_tokens,criterion, loss,
     #                 residue_struct, residue_seq, plddt,
     #                 configs.train_settings.residue_batch_size, accelerator)
     
-    logits, labels = info_nce_loss(features_MD, features_seq, configs.train_settings.n_views,
-                               configs.train_settings.temperature, accelerator)
+    # logits, labels = info_nce_loss(features_MD, features_seq, configs.train_settings.n_views,
+    #                            configs.train_settings.temperature, accelerator)
+
+    logits, labels = clip_infonce(features_MD, features_seq, configs.train_settings.temperature, accelerator)
+    
     # logits_residue, labels_residue = info_nce_loss(residue_struct, residue_seq, configs.train_settings.n_views,
     #                                                configs.train_settings.temperature, accelerator)
     
@@ -592,7 +595,8 @@ def prepare_loss_MD(simclr,traj,batch_tokens,criterion, loss,
     # else:
     #     simclr_residue_loss = torch.mean(criterion(logits_residue, labels_residue))
     
-    simclr_loss = torch.mean(criterion(logits, labels))
+    # simclr_loss = torch.mean(criterion(logits, labels))
+    simclr_loss = 0.5 * (torch.mean(criterion(logits, labels)) + torch.mean(criterion(logits.T, labels)))
     # loss += simclr_loss + simclr_residue_loss
     loss += simclr_loss
 

@@ -2434,6 +2434,24 @@ def info_nce_loss(features_struct, features_seq, n_views, temperature, accelerat
     logits = logits / temperature
     return logits, labels
 
+def clip_infonce(features_struct, features_seq, temperature, accelerator):
+    # features_struct, features_seq: [B, D]
+    B = features_struct.shape[0]
+
+    z_s = F.normalize(features_struct, dim=1)
+    z_q = F.normalize(features_seq, dim=1)
+
+    # cross-modal similarity only: [B, B]
+    logits = (z_s @ z_q.T) / temperature
+
+    targets = torch.arange(B, device=accelerator.device)
+
+    # loss_s2q = F.cross_entropy(logits, targets)
+    # loss_q2s = F.cross_entropy(logits.T, targets)
+
+    # loss = 0.5 * (loss_s2q + loss_q2s)
+    return logits, targets
+    # return loss
 
 class LayerNormNet(nn.Module):
     """

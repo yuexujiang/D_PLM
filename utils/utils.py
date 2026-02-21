@@ -102,10 +102,8 @@ def load_configs(config, args=None):
         Returns:
             The updated configuration dictionary with float values.
         """
-
     # Convert the dictionary to a Box object for easier access to the values.
     tree_config = Box(config)
-
     # Convert the necessary values to floats.
     tree_config.optimizer.lr_seq = float(tree_config.optimizer.lr_seq)
     tree_config.optimizer.lr_x = float(tree_config.optimizer.lr_x)
@@ -118,68 +116,48 @@ def load_configs(config, args=None):
     tree_config.optimizer.beta_2 = float(tree_config.optimizer.beta_2)
     tree_config.model.esm_encoder.lora.dropout = float(tree_config.model.esm_encoder.lora.dropout)
     tree_config.model.struct_encoder.lora.dropout = float(tree_config.model.struct_encoder.lora.dropout)
-
     # overwrite parameters if set through commandline
     if args is not None:
         if args.result_path:
             tree_config.result_path = args.result_path
-
         if args.resume_path:
             tree_config.resume.resume_path = args.resume_path
-
         if args.num_end_adapter_layers:
             tree_config.encoder.adapter_h.num_end_adapter_layers = int(args.num_end_adapter_layers)
-
         if args.module_type:
             tree_config.encoder.adapter_h.module_type = args.module_type
-        
         if args.restart_optimizer:
            tree_config.resume.restart_optimizer = args.restart_optimizer
-
-    
     #set configs value to default if doesn't have the attr
     if not hasattr(tree_config.model.struct_encoder, "use_seq"):
         tree_config.model.struct_encoder.use_seq = None
         tree_config.model.struct_encoder.use_seq.enable = False
         tree_config.model.struct_encoder.use_seq.seq_embed_mode = "embedding"
         tree_config.model.struct_encoder.use_seq.seq_embed_dim = 20
-    
     if not hasattr(tree_config.model.struct_encoder,"top_k"):
        tree_config.model.struct_encoder.top_k = 30 #default
-    
     if not hasattr(tree_config.model.struct_encoder,"gvp_num_layers"):
        tree_config.model.struct_encoder.gvp_num_layers = 3 #default
-    
     if not hasattr(tree_config.model.struct_encoder,"use_rotary_embeddings"): #configs also have num_rbf and num_positional_embeddings
         tree_config.model.struct_encoder.use_rotary_embeddings=False
-    
     if not hasattr(tree_config.model.struct_encoder,"rotary_mode"):
         tree_config.model.struct_encoder.rotary_mode=1
-    
     if not hasattr(tree_config.model.struct_encoder,"use_foldseek"): #configs also have num_rbf and num_positional_embeddings
         tree_config.model.struct_encoder.use_foldseek=False
-    
     if not hasattr(tree_config.model.struct_encoder,"use_foldseek_vector"): #configs also have num_rbf and num_positional_embeddings
         tree_config.model.struct_encoder.use_foldseek_vector=False
-    
     if not hasattr(tree_config.model.struct_encoder,"num_rbf"):
        tree_config.model.struct_encoder.num_rbf = 16 #default
-    
     if not hasattr(tree_config.model.struct_encoder,"num_positional_embeddings"):
        tree_config.model.struct_encoder.num_positional_embeddings = 16 #default
-    
     if not hasattr(tree_config.model.struct_encoder,"node_h_dim"):
        tree_config.model.struct_encoder.node_h_dim = (100,32) #default
     else:
        tree_config.model.struct_encoder.node_h_dim = ast.literal_eval(tree_config.model.struct_encoder.node_h_dim)
-    
     if not hasattr(tree_config.model.struct_encoder,"edge_h_dim"):
        tree_config.model.struct_encoder.edge_h_dim = (32,1) #default
     else:
        tree_config.model.struct_encoder.edge_h_dim = ast.literal_eval(tree_config.model.struct_encoder.edge_h_dim)
-    
-    
-    
     return tree_config
 
 def load_configs_infer(config, args=None):

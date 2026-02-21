@@ -36,8 +36,8 @@ def custom_collate(batch):
 def prepare_replicate(configs, train_repli_path, test_repli_path):
     samples = prepare_samples(train_repli_path)
     total_samples = len(samples)
-    val_size = int(total_samples * 0.1)
-    test_size = int(total_samples * 0.1)
+    val_size = int(total_samples * 0.05)
+    test_size = int(total_samples * 0.05)
     train_size = total_samples - val_size - test_size
     train_samples, val_samples, test_samples = random_split(samples, [train_size, val_size, test_size])
 

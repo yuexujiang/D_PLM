@@ -702,6 +702,20 @@ result_path='./results/vivit_cluster_adp6_adam/'
 sbatch --export=config_path=$config_path,result_path=$result_path, \
      -J ${task} \
      run_yjm85.sh
+
+task="vivit_3_clip"
+config_path='./configs_hell/gvp_v2/config_vivit3.yaml'
+result_path='./results/vivit_3_clip/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
+
+task="vivit_4_clip"
+config_path='./configs_hell/gvp_v2/config_vivit4.yaml'
+result_path='./results/vivit_4_clip/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
 ###############################
 task="ddt"
 sbatch -J ${task} ./evaluate/ddt_train.pbs
@@ -1121,6 +1135,14 @@ sbatch --export=model_location=$model_location,config_path=$config_path,scoring_
 task="vivit_cluster"
 model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_cluster_adp6_adam/checkpoints/checkpoint_best_val_rmsf_cor.pth'
 config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_cluster_adp6_adam/config_vivit_cluster_adp6_adam.yaml'
+scoring_strategy='wt-mt-RLA' #"mask-marginals" "wt-mt-RLA"
+sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
+       -J ${task} \
+       ./evaluate/mutation_effect_ESM1v.pbs
+
+task="vivit_clip4"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_4_clip/checkpoints/checkpoint_best_val_whole_loss.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/vivit_4_clip/config_vivit4.yaml'
 scoring_strategy='wt-mt-RLA' #"mask-marginals" "wt-mt-RLA"
 sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
        -J ${task} \
