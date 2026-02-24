@@ -166,6 +166,7 @@ if not args.use_dummy_encoder:
         
         args.model,args.alphabet = load_model(args)
 
+
 def get_embedding(seq: str) -> np.ndarray:
     """Return mean-pooled embedding vector for one amino-acid sequence."""
     if args.use_dummy_encoder:
@@ -417,6 +418,22 @@ print(f'  F1       : {f1:.4f}')
 print(f'  Precision: {prec:.4f}')
 print(f'  Recall   : {rec:.4f}')
 
+results.append(dict(
+        Dataset=name+"disorder_only",
+        N=len(disorder_y_true),
+        N_pos=int(disorder_y_true.sum()),
+        N_neg=int((disorder_y_true == 0).sum()),
+        ROC_AUC=round(auc,  4),
+        Accuracy=round(acc,  4),
+        F1=round(f1,   4),
+        Precision=round(prec, 4),
+        Recall=round(rec,  4),
+    ))
+
+# summary_df = pd.DataFrame(results)
+# summary_path = os.path.join(args.output_path, 'evaluation_results.csv')
+# summary_df.to_csv(summary_path, index=False)
+
 y_pred  = xgb_model.predict(fold_X)
 y_prob  = xgb_model.predict_proba(fold_X)[:, 1]
 try:
@@ -433,3 +450,19 @@ print(f'  Accuracy : {acc:.4f}')
 print(f'  F1       : {f1:.4f}')
 print(f'  Precision: {prec:.4f}')
 print(f'  Recall   : {rec:.4f}')
+
+results.append(dict(
+        Dataset=name+"fold_only",
+        N=len(fold_y_true),
+        N_pos=int(fold_y_true.sum()),
+        N_neg=int((fold_y_true == 0).sum()),
+        ROC_AUC=round(auc,  4),
+        Accuracy=round(acc,  4),
+        F1=round(f1,   4),
+        Precision=round(prec, 4),
+        Recall=round(rec,  4),
+    ))
+
+summary_df = pd.DataFrame(results)
+summary_path = os.path.join(args.output_path, 'evaluation_results.csv')
+summary_df.to_csv(summary_path, index=False)
