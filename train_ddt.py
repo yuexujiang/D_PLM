@@ -8,11 +8,12 @@ from time import time, sleep
 from tqdm import tqdm
 from utils.utils import load_configs_infer, test_gpu_cuda, prepare_tensorboard, prepare_optimizer_infer, save_checkpoint_infer, \
     get_logging, load_checkpoints_infer, prepare_saving_dir
-from data.data_ddt import prepare_dataloaders_fold, prepare_dataloaders_from_dms
+from data.data_ddt import prepare_dataloaders, prepare_dataloaders_from_dms
 from model_ddt import prepare_models
 from accelerate import Accelerator
 import torch.nn.functional as F
 from scipy.stats import spearmanr
+from sklearn.metrics import mean_squared_error
 # from focal_loss import FocalLoss
 
 
@@ -135,6 +136,8 @@ def valid(epoch, accelerator, dataloader, tools, tensorboard_log):
         preds.cpu().numpy(),
         labels.cpu().numpy()
     )
+    rmse = np.sqrt(mean_squared_error(labels.cpu().numpy(), preds.cpu().numpy()))
+    mae = np.mean(np.abs(labels.cpu().numpy() - preds.cpu().numpy()))
     # epoch_acc = accuracy.compute().cpu().item()
     # epoch_macro_f1 = macro_f1_score.compute().cpu().item()
     # epoch_f1 = f1_score.compute().cpu()
@@ -146,7 +149,7 @@ def valid(epoch, accelerator, dataloader, tools, tensorboard_log):
     # accuracy.reset()
     # macro_f1_score.reset()
     # f1_score.reset()
-    return valid_loss, epoch_spearman_cor
+    return valid_loss, epoch_spearman_cor, rmse, mae
 
 
 def main(args, dict_config, config_file_path):
@@ -169,7 +172,7 @@ def main(args, dict_config, config_file_path):
     # The trackers initialize automatically on the main process.
     if accelerator.is_main_process:
         accelerator.init_trackers("accelerator_tracker", config=None)
-    dataloaders_dict = prepare_dataloaders_fold(configs)
+    dataloaders_dict = prepare_dataloaders(configs)
     logging.info('preparing dataloaders are done')
     net = prepare_models(configs, logging)
     logging.info('preparing model is done')
@@ -319,7 +322,7 @@ def main(args, dict_config, config_file_path):
 
         if epoch % configs.valid_settings.do_every == 0 and epoch != 0:
             start_time = time()
-            valid_loss, valid_cor = valid(epoch, accelerator,
+            valid_loss, valid_cor, _ = valid(epoch, accelerator,
                                           dataloaders_dict["valid"],
                                           tools,
                                           tensorboard_log=False)
@@ -363,7 +366,7 @@ def main(args, dict_config, config_file_path):
     net.load_state_dict(model_checkpoint['model_state_dict'])
 
     start_time = time()
-    test_loss, test_cor = valid(0, accelerator, dataloaders_dict["test"],
+    test_loss, test_cor, _ = valid(0, accelerator, dataloaders_dict["test"],
                                                         tools, tensorboard_log=False)
     end_time = time()
     if accelerator.is_main_process:
@@ -381,7 +384,7 @@ def main(args, dict_config, config_file_path):
     net.load_state_dict(model_checkpoint['model_state_dict'])
 
     start_time = time()
-    test_loss, test_cor = valid(0, accelerator, dataloaders_dict["test"],
+    test_loss, test_cor, _ = valid(0, accelerator, dataloaders_dict["test"],
                                                         tools, tensorboard_log=False)
     end_time = time()
     if accelerator.is_main_process:

@@ -14,7 +14,8 @@ import pandas as pd
 import re
 import pickle
 from sklearn.metrics import (
-    roc_auc_score, accuracy_score, f1_score, precision_score, recall_score
+    roc_auc_score, accuracy_score, f1_score, precision_score, recall_score,
+    average_precision_score
 )
 import xgboost as xgb
 
@@ -61,7 +62,7 @@ os.makedirs(args.output_path, exist_ok=True)
 # 2.  Encoder helpers
 # ─────────────────────────────────────────────
 if not args.use_dummy_encoder:
-    if args.model_type=="d-plm":
+    if args.model_type=="d-plm" or args.model_type=="ESM2":
         import torch
         import esm
         import numpy as np
@@ -325,6 +326,8 @@ test_files = {
 }
 
 results = []
+with open(os.path.join(args.output_path, args.save_model), 'rb') as f:
+    xgb_model = pickle.load(f)
 
 print('\n=== Evaluating on test sets ===')
 for name, fpath in test_files.items():
@@ -352,12 +355,18 @@ for name, fpath in test_files.items():
     except ValueError:
         auc = float('nan')
 
+    try:
+        auprc = average_precision_score(y_true, y_prob)
+    except ValueError:
+        auprc = float('nan')
+
     acc  = accuracy_score(y_true, y_pred)
     f1   = f1_score(y_true, y_pred, zero_division=0)
     prec = precision_score(y_true, y_pred, zero_division=0)
     rec  = recall_score(y_true, y_pred, zero_division=0)
 
     print(f'  ROC-AUC  : {auc:.4f}')
+    print(f'  PRC-AUC  : {auprc:.4f}')
     print(f'  Accuracy : {acc:.4f}')
     print(f'  F1       : {f1:.4f}')
     print(f'  Precision: {prec:.4f}')
@@ -369,6 +378,7 @@ for name, fpath in test_files.items():
         N_pos=int(y_true.sum()),
         N_neg=int((y_true == 0).sum()),
         ROC_AUC=round(auc,  4),
+        PRC_AUC=round(auprc, 4),
         Accuracy=round(acc,  4),
         F1=round(f1,   4),
         Precision=round(prec, 4),
@@ -407,12 +417,17 @@ try:
     auc = roc_auc_score(disorder_y_true, y_prob)
 except ValueError:
     auc = float('nan')
+try:
+    auprc = average_precision_score(disorder_y_true, y_prob)
+except ValueError:
+    auprc = float('nan')
 acc  = accuracy_score(disorder_y_true, y_pred)
 f1   = f1_score(disorder_y_true, y_pred, zero_division=0)
 prec = precision_score(disorder_y_true, y_pred, zero_division=0)
 rec  = recall_score(disorder_y_true, y_pred, zero_division=0)
 
 print(f'  ROC-AUC  : {auc:.4f}')
+print(f'  PRC-AUC  : {auprc:.4f}')
 print(f'  Accuracy : {acc:.4f}')
 print(f'  F1       : {f1:.4f}')
 print(f'  Precision: {prec:.4f}')
@@ -424,6 +439,7 @@ results.append(dict(
         N_pos=int(disorder_y_true.sum()),
         N_neg=int((disorder_y_true == 0).sum()),
         ROC_AUC=round(auc,  4),
+        PRC_AUC=round(auprc, 4),
         Accuracy=round(acc,  4),
         F1=round(f1,   4),
         Precision=round(prec, 4),
@@ -440,12 +456,17 @@ try:
     auc = roc_auc_score(fold_y_true, y_prob)
 except ValueError:
     auc = float('nan')
+try:
+    auprc = average_precision_score(fold_y_true, y_prob)
+except ValueError:
+    auprc = float('nan')
 acc  = accuracy_score(fold_y_true, y_pred)
 f1   = f1_score(fold_y_true, y_pred, zero_division=0)
 prec = precision_score(fold_y_true, y_pred, zero_division=0)
 rec  = recall_score(fold_y_true, y_pred, zero_division=0)
 
 print(f'  ROC-AUC  : {auc:.4f}')
+print(f'  PRC-AUC  : {auprc:.4f}')
 print(f'  Accuracy : {acc:.4f}')
 print(f'  F1       : {f1:.4f}')
 print(f'  Precision: {prec:.4f}')
@@ -457,6 +478,7 @@ results.append(dict(
         N_pos=int(fold_y_true.sum()),
         N_neg=int((fold_y_true == 0).sum()),
         ROC_AUC=round(auc,  4),
+        PRC_AUC=round(auprc, 4),
         Accuracy=round(acc,  4),
         F1=round(f1,   4),
         Precision=round(prec, 4),
@@ -466,3 +488,69 @@ results.append(dict(
 summary_df = pd.DataFrame(results)
 summary_path = os.path.join(args.output_path, 'evaluation_results.csv')
 summary_df.to_csv(summary_path, index=False)
+
+####################################  plot
+
+AUROC=[0.991, 0.981, 0.981, 0.933, 0.916, 0.263, 0.479, 0.741, 0.911, 0.682]
+AUPRC=[0.994, 0.987, 0.982, 0.941, 0.902, 0.493, 0.489, 0.793, 0.862, 0.719]
+method_name=["DPLM", "MolPhase", "DeePhase","Fuzdrop","PSPHunter",
+             "LLPhyScore","PSAP","PSPire","Phaseek","PICNIC"]
+
+AUROC=[0.886, 0.876, 0.884, 0.837, 0.832, 0.406, 0.530, 0.769, 0.836, 0.643]
+AUPRC=[0.858, 0.834, 0.850, 0.834, 0.794, 0.542, 0.510, 0.810, 0.770, 0.621]
+method_name=["DPLM", "MolPhase", "DeePhase","Fuzdrop","PSPHunter",
+             "LLPhyScore","PSAP","PSPire","Phaseek","PICNIC"]
+             
+AUROC=[0.915, 0.888, 0.886, 0.818, 0.890, 0.467, 0.585, 0.768, 0.801, 0.744]
+AUPRC=[0.906, 0.846, 0.893, 0.830, 0.871, 0.563, 0.574, 0.756, 0.743, 0.746]
+method_name=["DPLM", "MolPhase", "DeePhase","Fuzdrop","PSPHunter",
+             "LLPhyScore","PSAP","PSPire","Phaseek","PICNIC"]
+
+AUROC=[0.903, 0.741, 0.891, 0.595, 0.799, 0.361, 0.590, 0.802, 0.486, 0.781]
+AUPRC=[0.911, 0.519, 0.893, 0.507, 0.695, 0.375, 0.448, 0.763, 0.321, 0.654]
+method_name=["DPLM", "MolPhase", "DeePhase","Fuzdrop","PSPHunter",
+             "LLPhyScore","PSAP","PSPire","Phaseek","PICNIC"]
+
+AUROC=[0.964, 0.908, 0.866, 0.897, 0.791, 0.256, 0.294, 0.590, 0.582, 0.674]
+AUPRC=[0.97, 0.914, 0.888, 0.900, 0.823, 0.483, 0.483, 0.563, 0.606, 0.670]
+method_name=["DPLM", "MolPhase", "DeePhase","Fuzdrop","PSPHunter",
+             "LLPhyScore","PSAP","PSPire","Phaseek","PICNIC"]
+import numpy as np
+import matplotlib.pyplot as plt
+
+AUROC=[0.886, 0.876, 0.884, 0.837, 0.832, 0.406, 0.530, 0.769, 0.836, 0.643]
+AUPRC=[0.858, 0.834, 0.850, 0.834, 0.794, 0.542, 0.510, 0.810, 0.770, 0.621]
+method_name=["DPLM", "MolPhase", "DeePhase","Fuzdrop","PSPHunter",
+             "LLPhyScore","PSAP","PSPire","Phaseek","PICNIC"]
+
+# Sort by AUROC descending
+order = np.argsort(AUROC)[::-1]
+AUROC_sorted     = np.array(AUROC)[order]
+AUPRC_sorted     = np.array(AUPRC)[order]
+methods_sorted   = np.array(method_name)[order]
+
+x = np.arange(len(methods_sorted))
+width = 0.35
+
+fig, ax = plt.subplots(figsize=(12, 5))
+
+bars1 = ax.bar(x - width/2, AUROC_sorted, width, label='AUROC', color='steelblue')
+bars2 = ax.bar(x + width/2, AUPRC_sorted, width, label='AUPRC', color='coral')
+
+ax.set_xticks(x)
+ax.set_xticklabels(methods_sorted, rotation=30, ha='right')
+ax.set_ylabel('Score')
+ax.set_ylim(0, 1.08)
+ax.legend()
+ax.set_title('Phase Separation Prediction: AUROC vs AUPRC by Method')
+
+for bar in bars1:
+    ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.01,
+            f'{bar.get_height():.3f}', ha='center', va='bottom', fontsize=7)
+for bar in bars2:
+    ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.01,
+            f'{bar.get_height():.3f}', ha='center', va='bottom', fontsize=7)
+
+plt.tight_layout()
+plt.savefig('./evaluate/phase_sep/xgboost/table1.png', dpi=150)
+plt.show()

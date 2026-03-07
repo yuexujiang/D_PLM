@@ -156,7 +156,7 @@ def prepare_dataloaders_from_dms(configs):
 
     return {"train": train_loader, "valid": val_loader}
 
-def prepare_dataloaders_fold(configs):
+def prepare_dataloaders(configs):
     df = pd.read_csv("./evaluate/ddt/S8754.csv")
     df["protein_id"] = df["name"].apply(extract_protein_id)
     proteins = df["protein_id"].unique()
@@ -192,7 +192,7 @@ if __name__ == '__main__':
 
     configs_file = load_configs(configs_dict)
 
-    dataloaders_dict = prepare_dataloaders_fold(configs_file)
+    dataloaders_dict = prepare_dataloaders(configs_file)
     max_position_value = []
     amino_acid = []
     for batch in dataloaders_dict['train']:
