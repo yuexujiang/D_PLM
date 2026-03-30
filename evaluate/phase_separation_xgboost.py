@@ -515,6 +515,19 @@ AUROC=[0.964, 0.908, 0.866, 0.897, 0.791, 0.256, 0.294, 0.590, 0.582, 0.674]
 AUPRC=[0.97, 0.914, 0.888, 0.900, 0.823, 0.483, 0.483, 0.563, 0.606, 0.670]
 method_name=["DPLM", "MolPhase", "DeePhase","Fuzdrop","PSPHunter",
              "LLPhyScore","PSAP","PSPire","Phaseek","PICNIC"]
+
+#disordered proteins only
+AUROC=[0.931, 0.884, 0.918, 0.914, 0.848, 0.677, 0.606, 0.839, 0.854, 0.642]
+AUPRC=[0.899, 0.810, 0.873, 0.903, 0.810, 0.707, 0.577, 0.875, 0.780, 0.608]
+method_name=["DPLM", "MolPhase", "DeePhase","Fuzdrop","PSPHunter",
+             "LLPhyScore","PSAP","PSPire","Phaseek","PICNIC"]
+
+#folded proteins only
+AUROC=[0.985, 0.962, 0.969, 0.898, 0.855, 0.105, 0.464, 0.701, 0.897, 0.641]
+AUPRC=[0.990, 0.974, 0.973, 0.921, 0.811, 0.332, 0.476, 0.757, 0.837, 0.640]
+method_name=["DPLM", "MolPhase", "DeePhase","Fuzdrop","PSPHunter",
+             "LLPhyScore","PSAP","PSPire","Phaseek","PICNIC"]
+
 import numpy as np
 import matplotlib.pyplot as plt
 

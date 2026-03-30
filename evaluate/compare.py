@@ -80,7 +80,75 @@ plt.subplots_adjust(bottom=0.5)  # Adjust the value as needed
 #plt.show()
 plt.savefig(f"/cluster/pixstor/xudong-lab/yuexu/D_PLM/ESM_1v_data/results/{csv_name}_{colname}.png")
 ###########################
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
 
+df = pd.read_csv("./ESM-1v data/results/ESM-1v_data_summary_start_end_seq_splm_esm2.csv")
+
+colname = "vivit3"
+
+# Define dataset groups: (datasets, background_color, group_label)
+group_defs = [
+    (['TPMT_HUMAN_Fowler2018', 'PTEN_HUMAN_Fowler2018'],                              "#ff8d8d", 'Protein stability'),
+    (['RASH_HUMAN_Kuriyan', 'AMIE_PSEAE_Whitehead', 'BG_STRSQ_hmmerbit'],             "#87ff87", 'Enzyme function'),
+    (['YAP1_HUMAN_Fields2012-singles', 'DLG4_RAT_Ranganathan2012'],                   "#9c9cff", 'Peptide binding'),
+    (['RL401_YEAST_Bolon2014', 'UBE4B_MOUSE_Klevit2013-singles'],                     "#ffbf60", 'Protein activity'),
+]
+
+# Compute mean DPLM score per dataset for sorting
+mean_score = df.groupby('Dataset_file')[colname].mean()
+
+def sort_by_score(datasets):
+    present = [ds for ds in datasets if ds in mean_score.index]
+    return sorted(present, key=lambda ds: mean_score[ds], reverse=True)
+
+# Build ordered dataset list: within each group sort by descending DPLM score
+all_datasets = df['Dataset_file'].unique().tolist()
+grouped_datasets = [ds for datasets, _, _ in group_defs for ds in datasets]
+remaining = [ds for ds in all_datasets if ds not in grouped_datasets]
+
+ordered_datasets = []
+for datasets, _, _ in group_defs:
+    ordered_datasets.extend(sort_by_score(datasets))
+ordered_datasets.extend(sort_by_score(remaining))
+
+# Sort dataframe by ordered categories
+df['Dataset_file'] = pd.Categorical(df['Dataset_file'], categories=ordered_datasets, ordered=True)
+df = df.sort_values('Dataset_file')
+
+plt.clf()
+plt.cla()
+fig, ax = plt.subplots(figsize=(12, 6))
+
+# Shade group backgrounds (before plotting so dots appear on top)
+for datasets, color, label in group_defs:
+    present = [ds for ds in ordered_datasets if ds in datasets]
+    if present:
+        start = ordered_datasets.index(present[0])
+        end = ordered_datasets.index(present[-1])
+        ax.axvspan(start - 0.5, end + 0.5, alpha=0.25, color=color, label=label, zorder=0)
+
+# Plot method1
+sns.scatterplot(x='Dataset_file', y='ESM2-wt-mt-RLA-euclidean_distance', data=df,
+                color='purple', label='ESM2', s=60, alpha=0.6, ax=ax)
+
+# Plot method2
+sns.scatterplot(x='Dataset_file', y=colname, data=df,
+                color='orange', label="DPLM", s=60, alpha=0.6, ax=ax)
+
+# Draw vertical lines at each x-tick
+for tick in ax.get_xticks():
+    ax.axvline(x=tick, color='gray', linestyle='--', alpha=0.7)
+
+# Set the labels and title
+ax.set_xlabel('Datasets')
+ax.set_ylabel('Spearmans')
+ax.set_title('Comparison of all the methods')
+ax.legend()
+plt.xticks(rotation=90)
+plt.subplots_adjust(bottom=0.5)
+plt.savefig(f"./ESM-1v data/results/dms.png")
 
 ################################################bar plots
 
