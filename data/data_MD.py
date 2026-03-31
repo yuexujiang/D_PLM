@@ -175,7 +175,7 @@ def prepare_samples(datapath):
     return samples
 
 
-def process_samples(data_folder2search, model_name, sub_list, output_folder):
+def process_samples(data_folder2search, model_name, sub_list, output_folder, permutate=False):
     image_processor = VivitImageProcessor.from_pretrained(model_name)
     model = VivitModel.from_pretrained(model_name)
     # Specify the parent folder (folder A)
@@ -214,6 +214,9 @@ def process_samples(data_folder2search, model_name, sub_list, output_folder):
                 #     data[pid]['ind2map'][i]=[]
 
                 traj = md.load(file_xtc_path, top=file_pdb_path)
+                if permutate:
+                    perm = np.random.choice(traj.n_frames, size=1000, replace=False)
+                    traj = traj[perm]
                 if len(traj)<32:
                     continue
                 # cutoff = 7  # in nanometers
@@ -261,7 +264,7 @@ def process_samples(data_folder2search, model_name, sub_list, output_folder):
                                            do_normalize=False, do_resize=False) # [1, 1000, 3, 224, 224]
                     images = images['pixel_values']
                     #print(images.dtype)
-                    groups = group_frames(images)
+                    groups = group_frames(images, permutate=permutate)
                     #print(groups.dtype)
                     groups = groups.to(device)
                     sub_num=groups.shape[0]//8
@@ -361,7 +364,7 @@ def loadh5(h5file):
     return pid, seq, rep
 
 
-def group_frames(traj, group_size=32): # traj => [1, 1001, 3, 224, 224]
+def group_frames(traj, group_size=32, permutate=False): # traj => [1, 1001, 3, 224, 224]
     """
     Group frames into sets of specified size.
     
@@ -372,6 +375,10 @@ def group_frames(traj, group_size=32): # traj => [1, 1001, 3, 224, 224]
     Returns:
         list: List of lists, where each inner list is a group of frames
     """
+    if permutate:
+        perm = torch.randperm(traj.shape[1])
+        traj = traj[:, perm, :, :, :]
+
     total_frames = traj.shape[1]
     groups = []
     
@@ -417,9 +424,15 @@ if __name__ == "__main__":
     parser.add_argument("--list_num", type=int, default=0, help="xx")
     parser.add_argument("--output_folder", default='/cluster/pixstor/xudong-lab/yuexu/D_PLM/processed_Atlas_data', help="xx")
     parser.add_argument("--split_num", type=int, default=6, help="xx")
+    parser.add_argument("--permutation", action='store_true', help='permutate in group_frames')
 
     
     args_main = parser.parse_args()
     lists = split_subfolders_into_n_lists(args_main.data_folder2search, n=args_main.split_num)
-    process_samples(args_main.data_folder2search, args_main.model_name,
+    if args_main.permutation:
+        process_samples(args_main.data_folder2search, args_main.model_name,
+                     sub_list=lists[args_main.list_num], output_folder=args_main.output_folder,
+                     permutate=True)
+    else:
+        process_samples(args_main.data_folder2search, args_main.model_name,
                      sub_list=lists[args_main.list_num], output_folder=args_main.output_folder)
