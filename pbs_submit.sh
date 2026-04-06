@@ -808,6 +808,20 @@ result_path='./results/vivit_4_clip/'
 sbatch --export=config_path=$config_path,result_path=$result_path, \
      -J ${task} \
      run_yjm85.sh
+
+task="random"
+config_path='./configs_hell/gvp_v2/config_vivit3_random.yaml'
+result_path='./results/ablation_random/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
+
+task="permu"
+config_path='./configs_hell/gvp_v2/config_vivit3_permutation.yaml'
+result_path='./results/ablation_permutation/'
+sbatch --export=config_path=$config_path,result_path=$result_path, \
+     -J ${task} \
+     run_yjm85.sh
 ###############################
 task="ddt"
 sbatch -J ${task} ./evaluate/ddt_train.pbs
