@@ -18,9 +18,12 @@ from Bio.PDB import PDBParser, PPBuilder
 from scipy.stats import spearmanr, pearsonr
 from sklearn.metrics import pairwise_distances
 import os
+import glob
 import h5py
 import pandas as pd
 import matplotlib.pyplot as plt
+from scipy.optimize import curve_fit
+import MDAnalysis as mda
 
 
 from sklearn.manifold import TSNE
@@ -303,6 +306,131 @@ def gogogo(args):
     #
     # return (rep_norm_list, rmsf_list), (rep_dis_list, dccm_list)
     return corr_list, (rep_norm_list, rmsf_list)
+
+
+def compute_autocorr_times(positions):
+    """
+    Compute per-residue autocorrelation times from C-alpha trajectory.
+
+    Parameters
+    ----------
+    positions : np.ndarray, shape [T, N, 3]
+        C-alpha positions over T frames for N residues.
+
+    Returns
+    -------
+    tau_c : np.ndarray, shape [N]
+        Per-residue autocorrelation time in units of trajectory frames.
+    """
+    T, N, _ = positions.shape
+    max_lag = T // 5  # reliable lag range: standard T/5 rule
+    lags = np.arange(max_lag, dtype=np.float64)
+
+    # Mean-center each residue across time
+    delta = positions - positions.mean(axis=0, keepdims=True)  # [T, N, 3]
+    # Scalar displacement magnitude per residue: [T, N]
+    d = np.sqrt(np.sum(delta ** 2, axis=-1))
+
+    tau_c = np.zeros(N)
+    for i in range(N):
+        x = d[:, i]
+        var = np.var(x)
+        if var < 1e-10:
+            tau_c[i] = 0.0
+            continue
+
+        # FFT-based normalized autocorrelation
+        x_centered = x - x.mean()
+        n_fft = 2 * T
+        X = np.fft.rfft(x_centered, n=n_fft)
+        acf_full = np.fft.irfft(X * np.conj(X))[:T].real
+        acf = acf_full[:max_lag] / acf_full[0]  # normalize so C(0) = 1
+
+        # Fit exponential decay C(tau) = exp(-tau / tau_c)
+        try:
+            popt, _ = curve_fit(
+                lambda t, tc: np.exp(-t / tc),
+                lags, acf,
+                p0=[10.0],
+                bounds=(0.1, T),
+                maxfev=2000,
+            )
+            tau_c[i] = popt[0]
+        except Exception:
+            # Fallback: integrated autocorrelation time (sum while positive)
+            tau_c[i] = float(np.sum(acf[acf > 0]))
+
+    return tau_c
+
+
+def gogogo_autocorr(args):
+    """
+    Correlation between D-PLM per-residue embedding norms and per-residue
+    autocorrelation times (tau_c) derived from MD trajectories.
+
+    tau_c is sensitive to temporal frame ordering, unlike RMSF/DCCM, making
+    this function suitable for the autocorrelation ablation test.
+
+    Returns
+    -------
+    corr_list : list of float
+        Per-protein Spearman correlations between embedding norms and tau_c.
+    (rep_norm_list, autocorr_tau_list) : tuple of lists
+        Aggregated residue norms and tau_c values across all proteins.
+    """
+    args.model, args.alphabet = load_model(args)
+
+    datapath = '/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_test/'
+    analysis_base = '/cluster/pixstor/xudong-lab/yuexu/D_PLM/analysis/'
+    processed_list = []
+    rep_norm_list = []
+    autocorr_tau_list = []
+    corr_list = []
+
+    for file_name in os.listdir(datapath):
+        print(f"processing...{file_name}")
+        pid = "_".join(file_name.split('_')[:2])
+        if pid in processed_list:
+            continue
+
+        pdb_file = os.path.join(analysis_base, f"{pid}_analysis", f"{pid}.pdb")
+        args.sequence = str(pdb2seq(pdb_file))
+
+        # Embeddings
+        seq_emb = main(args)  # [seq_l+2, 1280]
+        seq_emb = seq_emb[1:-1]
+        residue_norms = np.linalg.norm(seq_emb.cpu(), axis=1)  # [N]
+
+        # Find XTC trajectory (take first match, typically R1)
+        xtc_pattern = os.path.join(analysis_base, f"{pid}_analysis", "*_R1.xtc")
+        xtc_files = sorted(glob.glob(xtc_pattern))
+        if not xtc_files:
+            print(f"  No XTC found for {pid}, skipping.")
+            processed_list.append(pid)
+            continue
+        xtc_file = xtc_files[0]
+
+        # Load trajectory and collect C-alpha positions
+        u = mda.Universe(pdb_file, xtc_file)
+        ca = u.select_atoms("name CA")
+        positions = np.array([ca.positions.copy() for _ in u.trajectory])  # [T, N_ca, 3]
+
+        # Compute per-residue autocorrelation times
+        tau_c = compute_autocorr_times(positions)  # [N_ca]
+
+        # Align lengths in case of chain breaks or missing residues
+        min_len = min(len(residue_norms), len(tau_c))
+        residue_norms = residue_norms[:min_len]
+        tau_c = tau_c[:min_len]
+
+        rep_norm_list.extend(residue_norms)
+        autocorr_tau_list.extend(tau_c)
+        corr, _ = spearmanr(residue_norms, tau_c)
+        corr_list.append(corr)
+        processed_list.append(pid)
+
+    return corr_list, (rep_norm_list, autocorr_tau_list)
+
 
 from transformers import AutoTokenizer
 import sys
