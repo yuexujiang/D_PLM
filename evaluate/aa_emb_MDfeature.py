@@ -240,8 +240,8 @@ def gogogo(args):
     datapath = '/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_test/'
     # datapath_MDfeature = '/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_test_R1/'
     processed_list=[]
-    # rep_norm_list=[]
-    # rmsf_list=[]
+    rep_norm_list=[]
+    rmsf_list=[]
     # rep_dis_list=[]
     # dccm_list=[]
     corr_list=[]
@@ -262,8 +262,8 @@ def gogogo(args):
         rmsf_file = os.path.join("/cluster/pixstor/xudong-lab/yuexu/D_PLM/analysis/", f"{pid}_analysis", f"{pid}_RMSF.tsv")
         df = pd.read_csv(rmsf_file, sep="\t")
         r1 = df["RMSF_R1"].values
-        # rep_norm_list.extend(residue_norms)
-        # rmsf_list.extend(r1)
+        rep_norm_list.extend(residue_norms)
+        rmsf_list.extend(r1)
         corr, _ = spearmanr(residue_norms, r1)
         corr_list.append(corr)
         # r2 = df["RMSF_R2"].values
@@ -302,7 +302,7 @@ def gogogo(args):
         processed_list.append(pid)
     #
     # return (rep_norm_list, rmsf_list), (rep_dis_list, dccm_list)
-    return corr_list
+    return corr_list, (rep_norm_list, rmsf_list)
 
 from transformers import AutoTokenizer
 import sys

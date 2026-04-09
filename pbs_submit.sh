@@ -1253,6 +1253,22 @@ scoring_strategy='wt-mt-RLA' #"mask-marginals" "wt-mt-RLA"
 sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
        -J ${task} \
        ./evaluate/mutation_effect_ESM1v.pbs
+
+task="ablation_random"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/ablation_random/checkpoints/checkpoint_best_val_rmsf_cor.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/ablation_random/config_vivit3_random.yaml'
+scoring_strategy='wt-mt-RLA' #"mask-marginals" "wt-mt-RLA"
+sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
+       -J ${task} \
+       ./evaluate/mutation_effect_ESM1v.pbs
+
+task="ablation_permutation"
+model_location='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/ablation_permutation/checkpoints/checkpoint_best_val_rmsf_cor.pth'
+config_path='/cluster/pixstor/xudong-lab/yuexu/D_PLM/results/ablation_permutation/config_vivit3_permutation.yaml'
+scoring_strategy='wt-mt-RLA' #"mask-marginals" "wt-mt-RLA"
+sbatch --export=model_location=$model_location,config_path=$config_path,scoring_strategy=$scoring_strategy, \
+       -J ${task} \
+       ./evaluate/mutation_effect_ESM1v.pbs
 #####################################################
 task="v2"
 folder='/cluster/pixstor/xudong-lab/yuexu/D_PLM/v2_newly_added/'
