@@ -236,6 +236,137 @@ def plot_and_fit(x, y, xlabel, ylabel, correlation, output_path, figure_name):
     # plt.show()
     plt.savefig(os.path.join(output_path, f"{figure_name}.png"))
 
+def random_adapter_each(args):
+    import torch
+    each_cor_mean=[]
+    for layer_idx in range(17,33):
+    #
+        args.model,args.alphabet = load_model(args)
+        # --- Random ablation: reinitialize all adapter layer weights ---
+        
+        # for layer in args.model.layers:
+        #     if hasattr(layer, 'adapter_layer_dict'):
+        #         for adapter_list in layer.adapter_layer_dict.values():
+        #             for adapter in adapter_list:          # each ResMLP
+        #                 for module in adapter.module:
+        #                     if hasattr(module, 'weight'):
+        #                         # torch.nn.init.kaiming_uniform_(module.weight)
+        #                         torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+        #                     if hasattr(module, 'bias') and module.bias is not None:
+        #                         torch.nn.init.zeros_(module.bias)
+        for i, layer in enumerate(args.model.layers):
+            if i==layer_idx:
+                if hasattr(layer, 'adapter_layer_dict') and layer.adapter_layer_dict is not None:
+                    for adapter_list in layer.adapter_layer_dict.values():
+                        for adapter in adapter_list:
+                            for module in adapter.module:
+                                if hasattr(module, 'weight'):
+                                    # torch.nn.init.kaiming_uniform_(module.weight)
+                                    torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+                                if hasattr(module, 'bias') and module.bias is not None:
+                                    torch.nn.init.zeros_(module.bias)
+                    #
+                    datapath = '/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_test/'
+                    # datapath_MDfeature = '/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_test_R1/'
+                    processed_list=[]
+                    rep_norm_list=[]
+                    rmsf_list=[]
+                    # rep_dis_list=[]
+                    # dccm_list=[]
+                    corr_list=[]
+                    for file_name in os.listdir(datapath):
+                        print(f"processing...{file_name}")
+                        pid="_".join(file_name.split('_')[:2])
+                        if pid in processed_list:
+                            continue
+                        pdb_file = os.path.join("/cluster/pixstor/xudong-lab/yuexu/D_PLM/analysis/", f"{pid}_analysis", f"{pid}.pdb")
+                        args.sequence = str(pdb2seq(pdb_file))
+                        #
+                        seq_emb = main(args) #[seq_l+2, 1280]
+                        seq_emb = seq_emb[1:-1]
+                        # print(seq_emb.shape)
+                        distance_matrix = pairwise_distances(seq_emb.cpu(), metric="euclidean")  # or cosine
+                        residue_norms = np.linalg.norm(seq_emb.cpu(), axis=1)
+                        #
+                        rmsf_file = os.path.join("/cluster/pixstor/xudong-lab/yuexu/D_PLM/analysis/", f"{pid}_analysis", f"{pid}_RMSF.tsv")
+                        df = pd.read_csv(rmsf_file, sep="\t")
+                        r1 = df["RMSF_R1"].values
+                        # rep_norm_list.extend(residue_norms)
+                        # rmsf_list.extend(r1)
+                        corr, _ = spearmanr(residue_norms, r1)
+                        corr_list.append(corr)
+                        
+                        processed_list.append(pid)
+                    each_cor_mean.append(np.mean(corr_list))
+    return each_cor_mean
+    #
+    # return (rep_norm_list, rmsf_list), (rep_dis_list, dccm_list)
+    # return corr_list
+
+def random_adapter(args):
+    #
+    args.model,args.alphabet = load_model(args)
+    # --- Random ablation: reinitialize all adapter layer weights ---
+    import torch
+    # for layer in args.model.layers:
+    #     if hasattr(layer, 'adapter_layer_dict'):
+    #         for adapter_list in layer.adapter_layer_dict.values():
+    #             for adapter in adapter_list:          # each ResMLP
+    #                 for module in adapter.module:
+    #                     if hasattr(module, 'weight'):
+    #                         # torch.nn.init.kaiming_uniform_(module.weight)
+    #                         torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+    #                     if hasattr(module, 'bias') and module.bias is not None:
+    #                         torch.nn.init.zeros_(module.bias)
+    for layer in args.model.layers:
+        if hasattr(layer, 'adapter_layer_dict') and layer.adapter_layer_dict is not None:
+            for adapter_list in layer.adapter_layer_dict.values():
+                for adapter in adapter_list:
+                    for module in adapter.module:
+                        if hasattr(module, 'weight'):
+                            # torch.nn.init.kaiming_uniform_(module.weight)
+                            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+                        if hasattr(module, 'bias') and module.bias is not None:
+                            torch.nn.init.zeros_(module.bias)
+    #
+    datapath = '/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_geom2vec_test/'
+    # datapath_MDfeature = '/cluster/pixstor/xudong-lab/yuexu/D_PLM/Atlas_MDfeature_test_R1/'
+    processed_list=[]
+    rep_norm_list=[]
+    rmsf_list=[]
+    # rep_dis_list=[]
+    # dccm_list=[]
+    corr_list=[]
+    for file_name in os.listdir(datapath):
+        file_name = file_name.strip()
+        if not file_name:          # skip empty filenames
+            continue
+        print(f"processing...{file_name}")
+        pid="_".join(file_name.split('_')[:2])
+        if pid in processed_list:
+            continue
+        pdb_file = os.path.join("/cluster/pixstor/xudong-lab/yuexu/D_PLM/analysis/", f"{pid}_analysis", f"{pid}.pdb")
+        args.sequence = str(pdb2seq(pdb_file))
+        #
+        seq_emb = main(args) #[seq_l+2, 1280]
+        seq_emb = seq_emb[1:-1]
+        # print(seq_emb.shape)
+        distance_matrix = pairwise_distances(seq_emb.cpu(), metric="euclidean")  # or cosine
+        residue_norms = np.linalg.norm(seq_emb.cpu(), axis=1)
+        #
+        rmsf_file = os.path.join("/cluster/pixstor/xudong-lab/yuexu/D_PLM/analysis/", f"{pid}_analysis", f"{pid}_RMSF.tsv")
+        df = pd.read_csv(rmsf_file, sep="\t")
+        r1 = df["RMSF_R1"].values
+        rep_norm_list.extend(residue_norms)
+        rmsf_list.extend(r1)
+        corr, _ = spearmanr(residue_norms, r1)
+        corr_list.append(corr)
+        
+        processed_list.append(pid)
+    #
+    # return (rep_norm_list, rmsf_list), (rep_dis_list, dccm_list)
+    return corr_list
+
 def gogogo(args):
     #
     args.model,args.alphabet = load_model(args)
@@ -249,6 +380,9 @@ def gogogo(args):
     # dccm_list=[]
     corr_list=[]
     for file_name in os.listdir(datapath):
+        file_name = file_name.strip()
+        if not file_name:          # skip empty filenames
+            continue
         print(f"processing...{file_name}")
         pid="_".join(file_name.split('_')[:2])
         if pid in processed_list:
